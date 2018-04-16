@@ -36,6 +36,30 @@ setup() {
     kernel_load
 }
 
+_queues_load_personality() {
+  if [ -z "${_QUEUES_PERSONALITY_LOADED}" ]; then
+    eval $(_queues_extract_personality)
+    _QUEUES_PERSONALITY_LOADED=true
+  fi
+}
+
+_queues_extract_personality() {
+  ruby_run <<RUBY
+require 'yaml'
+p_file = '${cw_ROOT}/etc/personality.yml'
+begin
+  if File.exists?(p_file)
+    personality = YAML.load_file(p_file)
+    if queues_config = personality['queue-manager']
+      queues_config.each do |key, value|
+        puts "_QUEUES_#{key}=#{value}"
+      end
+    end
+  end
+end
+RUBY
+}
+
 _queues_cluster_uuid() {
   if [ -z "${cw_CLUSTER_uuid}" ]; then
       files_load_config config config/cluster
@@ -46,10 +70,11 @@ _queues_cluster_uuid() {
 _queues_endpoint() {
   local uuid
   uuid="$(_queues_cluster_uuid)"
-  echo "${_QUEUES_ENDPOINT_URL:-https://launch-api.alces-flight.com}/api/v1/clusters/${uuid}/compute-queue-actions"
+  echo "${_QUEUES_endpoint_url:-https://launch-api.alces-flight.com}/api/v1/clusters/${uuid}/compute-queue-actions"
 }
 
 main() {
+  _queues_load_personality
   local feature_dir
   files_load_config instance config/cluster
   if [ "${cw_INSTANCE_role}" != "master" ]; then
