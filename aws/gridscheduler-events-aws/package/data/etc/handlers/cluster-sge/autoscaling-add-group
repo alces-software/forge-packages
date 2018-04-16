@@ -1,0 +1,49 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+  local groupname group_maxsize cores_per_node
+  echo "Received autoscaling-add-group with args ${*}"
+
+  if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+    groupname="$1"
+    group_maxsize="$2"
+    cores_per_node="$3"
+
+    handler_run_helper share/add-hostgroup "${groupname}" "${cores_per_node}"
+    handler_run_helper share/add-queues "${groupname}" "${groupname}"  # Uses groupname also as hostgroup name
+    handler_run_helper share/create-parallel-environments "${groupname}"
+  fi
+}
+
+setup
+require member
+require network
+require handler
+require log
+require files
+
+files_load_config --optional cluster-sge
+files_load_config instance config/cluster
+log_set_default "${cw_CLUSTER_SGE_log:-/var/log/clusterware/cluster-sge.log}"
+handler_tee main "$@"

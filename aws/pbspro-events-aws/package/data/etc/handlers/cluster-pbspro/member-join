@@ -1,0 +1,97 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_create_compute_config() {
+    local name domainname short_name
+    name="$1"
+    domainname="$(hostname -d)"
+    if [[ "${name}" != *"."* ]]; then
+        # name is simply "<hostname>"
+        short_name="${name}"
+        name="${name}.${domainname}"
+    else
+        if [[ "${name}" != *".${domainname}" ]]; then
+            # name is "<hostname>.<subdomain>"
+            name="$1.${domainname}"
+        fi
+        short_name=$(echo ${name} | cut -f1 -d'.')
+    fi
+    cat <<EOF > "${cw_ROOT}"/opt/pbspro/etc/pbs.conf
+PBS_SERVER=${name}
+PBS_EXEC=${cw_ROOT}/opt/pbspro
+PBS_HOME=/var/spool/pbs
+PBS_CORE_LIMIT=unlimited
+PBS_SCP=/bin/scp
+EOF
+    cat <<EOF > /var/spool/pbs/mom_priv/config
+$clienthost ${name}
+EOF
+}
+
+main() {
+    local scheduler_roles slots intf
+    files_load_config instance config/cluster
+
+    eval "$(member_parse)"
+    log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    log "Checking roles for new member (${cw_MEMBER_name})"
+    scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+    slots=$(member_find_tag "slots" "${cw_MEMBER_tags}")
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* && "${scheduler_roles}" == *":compute:"* ]]; then
+        log "${cw_MEMBER_name} is PBSPro compute node"
+        handler_run_helper share/add-node "${cw_MEMBER_name}" "${slots}"
+    fi
+    if [[ "${scheduler_roles}" == *":master:"* ]]; then
+        log "${cw_MEMBER_name} is PBSPro server node"
+        _create_compute_config "${cw_MEMBER_name}"
+        if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+            # We are a compute node and the master node is now up, so start our
+            # MOM service.
+            distro_start_service clusterware-pbspro-mom
+        fi
+    fi
+
+    # Add Pbspro iptables rules.
+    intf="$(network_get_route_iface ${cw_MEMBER_ip})"
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        handler_iptables_insert INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 15001 -j ACCEPT 2>&1 | log_blob
+    fi
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* && "${scheduler_roles}" == *":master:"* ]]; then
+        handler_iptables_insert INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 15002 -j ACCEPT 2>&1 | log_blob
+        handler_iptables_insert INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 15003 -j ACCEPT 2>&1 | log_blob
+    fi
+}
+
+setup
+require distro
+require member
+require handler
+require files
+require log
+require network
+
+files_load_config --optional cluster-pbspro
+log_set_default "${cw_CLUSTER_PBSPRO_log:-/var/log/clusterware/cluster-pbspro.log}"
+handler_tee main "$@"

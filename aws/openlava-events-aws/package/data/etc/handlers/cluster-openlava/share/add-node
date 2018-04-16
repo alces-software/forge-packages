@@ -1,0 +1,56 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+# http://www.admin-magazine.com/HPC/Articles/openlava-Hot-Resource-Manager
+# - Thanks Jeff! Coolio!
+
+name="$1"
+scheduler_roles="$2"
+slots="$3"
+
+# Add compute node anchor to lsf.cluster.openlava if it doesn't exist
+# yet.
+if ! grep -q "^#=Alces Clusterware Compute Nodes" "${cw_ROOT}"/opt/openlava/etc/lsf.cluster.openlava; then
+    sed -e "/^HOSTNAME/a #=Alces Clusterware Compute Nodes" \
+        -i "${cw_ROOT}"/opt/openlava/etc/lsf.cluster.openlava
+fi
+
+name="$(echo "${name}" | cut -f1 -d.)"
+
+mkdir -p "${cw_ROOT}"/var/lock
+exec 9> "${cw_ROOT}"/var/lock/cluster-openlava.lock && flock -w30 9
+# Add entry to lsf.cluster.openlava
+if grep -q "^${name} " "${cw_ROOT}"/opt/openlava/etc/lsf.cluster.openlava; then
+    echo "${name} is already registered to cluster"
+else
+    if [[ "${scheduler_roles}" == *":master":* ]]; then
+        echo "${name} is OpenLava master node"
+        anchor="HOSTNAME"
+    elif [[ "${scheduler_roles}" == *":compute:"* ]]; then
+        echo "${name} is OpenLava compute node"
+        anchor="#=Alces Clusterware Compute Nodes"
+    fi
+    echo "Adding ${name} to cluster"
+    sed -e "/^${anchor}/a ${name} ! ! 1 - -" \
+        -i "${cw_ROOT}"/opt/openlava/etc/lsf.cluster.openlava
+fi
+
+# Add entry to lsb.hosts
+if grep -q "^${name} " "${cw_ROOT}"/opt/openlava/etc/lsb.hosts; then
+    echo "${name} already has a host definition"
+else
+    if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+        slots=${slots:-1}
+    else
+        # we set MXJ to 0 to ensure jobs aren't scheduled on this host
+        slots="0"
+    fi
+    echo "Adding host definition for ${name} with ${slots}"
+    sed -e "/^HOST_NAME/a ${name} ${slots} () () () () () ()" \
+        -i "${cw_ROOT}"/opt/openlava/etc/lsb.hosts
+fi
+exec 9>&-

@@ -1,0 +1,82 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_configure_slurm() {
+    local slurm_system_dirs slurm_user munge_path munge_key_dir munge_key munge_user hook_dir hostname
+
+    echo "Configuring Slurm"
+
+    # Create needed system dirs owned by Slurm user.
+    slurm_system_dirs=(/var/{log,run,spool}/slurm)
+    slurm_user='slurm'
+    mkdir -p "${slurm_system_dirs[@]}"
+    touch /var/log/slurm/accounting
+    chown -R "${slurm_user}:${slurm_user}" "${slurm_system_dirs[@]}"
+    chmod 0644 /var/log/slurm/accounting
+
+    # Create MUNGE key, required for authentication between nodes - must be the
+    # same on all nodes so create by hashing the cluster secret. Note: Create
+    # in this hook as need auth.rc to be created which is not done until
+    # clusterable preconfigure hook.
+    munge_path="$(echo ~munge)"
+    munge_key_dir="${munge_path}/etc/munge"
+    munge_key="${munge_key_dir}/munge.key"
+    munge_user='munge'
+
+    files_load_config auth config/cluster
+    echo -n "${cw_CLUSTER_auth_token}" | sha512sum | cut -d' ' -f1 > "${munge_key}"
+    chmod 400 "${munge_key}"
+    chown -R "${munge_user}:${munge_user}" "${munge_key_dir}"
+
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+        echo "Instance is Slurm compute node, writing node resource tags"
+        handler_add_libdir "${cw_ROOT}"/var/lib/scheduler
+        require slurm
+        slurm_write_node_resources "${cw_ROOT}/etc/serf/tags-node-resources.json"
+        require distro
+        distro_restart_service clusterware-serf
+    fi
+}
+
+main() {
+    local handler_config_dir="${cw_ROOT}/etc/config/cluster-slurm"
+
+    # Bail out if we're already configured (this is a reboot).
+    if [ -d "${handler_config_dir}" ]; then
+        exit 0
+    fi
+
+    mkdir -p "${handler_config_dir}"
+
+    _configure_slurm
+}
+
+setup
+require handler
+require files
+
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

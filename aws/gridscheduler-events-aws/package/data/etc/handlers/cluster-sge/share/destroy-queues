@@ -1,0 +1,57 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+# Destroy queues for an autoscaling group.
+
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.vars.sh
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/cluster-sge.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}
+
+if [ -f "${cw_ROOT}/etc/cluster-sge.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-sge.rc"
+fi
+
+if _lock; then
+  groupname="$1"
+
+  if qconf -sq "${groupname}.byslot.q" > /dev/null 2>&1; then
+    echo "Destroying queues for $groupname"
+    tmpfile="$(mktemp /tmp/sge-add-queue.XXXXXXXX)"
+
+    # First we need to unsubordinate from byslot.q and bynode.q and each other
+
+    for q in "byslot.q" "bynode.q" "${groupname}.byslot.q" "${groupname}.bynode.q"; do
+
+      qconf -sq "$q" | \
+        tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+        sed -r -e "s/subordinate_list (.*)${groupname}.bynode.q(=1)?,?(.*)/subordinate_list \1\3/" \
+               -e "s/subordinate_list (.*)${groupname}.byslot.q(=1)?,?(.*)/subordinate_list \1\3/" \
+               -e "s/,\s*$//" > "$tmpfile"
+      qconf -Mq "$tmpfile"
+
+    done
+
+    qconf -dq "${groupname}.bynode.q"
+    qconf -dq "${groupname}.byslot.q"
+
+    rm "$tmpfile"
+
+  fi
+else
+    echo "Locking failed; unable to destroy queues"
+fi

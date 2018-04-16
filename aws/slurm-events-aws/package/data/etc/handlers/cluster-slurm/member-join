@@ -1,0 +1,96 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local scheduler_roles slots
+    files_load_config instance config/cluster
+    files_load_config network
+
+    eval "$(member_parse)"
+    slurm_log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    slurm_log "Checking roles for new member (${cw_MEMBER_name})"
+    scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+    slots=$(member_find_tag "slots" "${cw_MEMBER_tags}")
+
+    short_node_name="$(echo ${cw_MEMBER_name} | sed -e "s/.${cw_NETWORK_domain}$//")"
+
+    # Update this node's slurm.conf with new node.
+    if [[ "${scheduler_roles}" == *":master:"* ]]; then
+        slurm_log "${cw_MEMBER_name} is Slurm control node"
+        sed -i "s/^ControlMachine=.*$/ControlMachine=${cw_MEMBER_name}/" "${cw_CLUSTER_SLURM_config}"
+        if [[ "${scheduler_roles}" != *":compute:"* ]]; then
+            handler_run_helper share/add-node "${short_node_name}" "1" "" "FUTURE"
+        fi
+    fi
+    if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+        slurm_log "${cw_MEMBER_name} is Slurm compute node"
+        handler_run_helper share/add-node "${short_node_name}" "${slots}"
+    elif [[ "${scheduler_roles}" == *":submit:"* ]]; then
+        slurm_log "${cw_MEMBER_name} is a submit-only host"
+        handler_run_helper share/add-node "${short_node_name}" "1" "" "FUTURE"
+    fi
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        # We are the master node; we need to restart our slurmctld and then
+        # tell all compute nodes to reread their config.
+        # Note: is it possible this could cause an issue if a compute node has
+        # not yet updated their config?
+        distro_restart_service clusterware-slurm-slurmctld
+        "${cw_ROOT}/opt/slurm/bin/scontrol" reconfigure
+    fi
+    if [[ "${scheduler_roles}" == *":master:"* ]]; then
+        if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+            # We are a compute node and the master node is now up, so start our
+            # slurmd. Note: we need to know the master node first so our slurm.conf
+            # and /etc/hosts can be updated with it, otherwise slurmd won't start.
+            distro_start_service clusterware-slurm-slurmd
+        elif [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":submit:"* ]]; then
+            # We are a submit-only host and the master node is now up,
+            # so start munged so we can communicate with it
+            # appropriately.
+            distro_start_service clusterware-slurm-munged
+        fi
+    fi
+
+    # Add Slurm iptables rules.
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        handler_iptables_insert $(slurm_control_node_iptables_rule ${cw_MEMBER_ip}) 2>&1 | slurm_log_blob
+    fi
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* && "${scheduler_roles}" == *":master:"* ]]; then
+        handler_iptables_insert $(slurm_compute_node_iptables_rule ${cw_MEMBER_ip}) 2>&1 | slurm_log_blob
+    fi
+}
+
+setup
+require distro
+require member
+require handler
+require files
+
+handler_add_libdir share
+require slurm-handler
+
+files_load_config --optional cluster-slurm
+export cw_CLUSTER_SLURM_config
+handler_tee main "$@"

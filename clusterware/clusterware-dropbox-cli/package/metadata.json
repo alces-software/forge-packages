@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "clusterware-dropbox-cli",
+    "version": "2.0.0-dev",
+    "summary": "Clusterware CLI tool for Dropbox",
+    "dependencies": [
+    ]
+  }
+}

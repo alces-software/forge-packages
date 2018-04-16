@@ -1,0 +1,121 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook helper
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_initialize_depots() {
+    export cw_UI_disable_spinner=true
+    "${cw_ROOT}"/bin/alces gridware init --update-config
+}
+
+_relink_depots() {
+    local depots a source target
+    depots="${cw_GRIDWARE_default_depot} ${cw_GRIDWARE_depots}"
+    for a in $depots; do
+        if [ -L "${cw_GRIDWARE_root}/${a}" ]; then
+            source="$(readlink ${cw_GRIDWARE_root}/${a})"
+            target="${cw_GRIDWARE_root}/depots/$(uuid -v4 | cut -f1 -d'-')"
+            mv "${source}" "${target}"
+            ln -snf "${target}" ${cw_GRIDWARE_root}/${a}
+        fi
+    done
+}
+
+_configure_depot_nfs() {
+    cat <<EOF > "${cw_ROOT}"/etc/cluster-nfs.d/cluster-gridware.rc
+################################################################################
+##
+## Alces Clusterware - Shell configuration
+## Copyright (c) 2008-2015 Alces Software Ltd
+##
+################################################################################
+if [ -d "${cw_GRIDWARE_root:-/opt/gridware}" ]; then
+    for a in ${cw_GRIDWARE_root:-/opt/gridware}/*; do
+        if [ -L "\$a" ]; then
+            cw_CLUSTER_NFS_exports="\${cw_CLUSTER_NFS_exports} \$(readlink \$a)"
+        fi
+    done
+    cw_CLUSTER_NFS_exports="\${cw_CLUSTER_NFS_exports} ${cw_GRIDWARE_root:-/opt/gridware}/etc ${cw_GRIDWARE_root:-/opt/gridware}/data ${cw_GRIDWARE_root:-/opt/gridware}/depots/u"
+fi
+EOF
+}
+
+_fetch_depots() {
+   local urlvar a
+
+   files_load_config distro
+   for a in ${cw_GRIDWARE_depots}; do
+       args=(--yes --binary --no-notify)
+       if [[ "${cw_GRIDWARE_depots_disabled}" == *":${a}:"* ]]; then
+           args+=(--disabled)
+       fi
+       "${cw_ROOT}"/bin/alces gridware depot "${args[@]}" install "${a}"
+   done
+}
+
+_configure_docker_nfs() {
+    cat <<EOF > "${cw_ROOT}"/etc/cluster-nfs.d/cluster-gridware-docker.rc
+################################################################################
+##
+## Alces Clusterware - Shell configuration
+## Copyright (c) 2017 Alces Software Ltd
+##
+################################################################################
+if [ -d "${cw_GRIDWARE_root:-/opt/gridware}/docker/exports" ]; then
+    cw_CLUSTER_NFS_exports="\${cw_CLUSTER_NFS_exports} ${cw_GRIDWARE_root:-/opt/gridware}/docker/exports ${cw_GRIDWARE_root:-/opt/gridware}/docker/certificates/public ${cw_GRIDWARE_root:-/opt/gridware}/docker/swarm"
+fi
+EOF
+}
+
+main() {
+    files_load_config gridware config/gridware
+    files_load_config gridware
+
+    export HOME=${HOME:-/tmp}
+
+    _initialize_depots
+    mkdir -p "${cw_GRIDWARE_root:-/opt/gridware}"/data
+    chmod 2775 "${cw_GRIDWARE_root:-/opt/gridware}"/data
+
+    mkdir -p "${cw_GRIDWARE_root:-/opt/gridware}"/depots/u
+    chmod 1777 "${cw_GRIDWARE_root:-/opt/gridware}"/depots/u
+
+    # relink in case depots were initialized as part of base image
+    _relink_depots
+    _configure_depot_nfs
+    _fetch_depots
+
+    mkdir -p "${cw_GRIDWARE_root:-/opt/gridware}"/docker/exports
+    chmod 2775 "${cw_GRIDWARE_root:-/opt/gridware}"/docker/exports
+    mkdir -p "${cw_GRIDWARE_root:-/opt/gridware}"/docker/certificates/public
+    chmod 2775 "${cw_GRIDWARE_root:-/opt/gridware}"/docker/certificates/public
+    mkdir -p "${cw_GRIDWARE_root:-/opt/gridware}"/docker/swarm
+    chmod 2775 "${cw_GRIDWARE_root:-/opt/gridware}"/docker/swarm
+    _configure_docker_nfs
+
+    echo 'cw_GRIDWARE_notify=true' >> "${cw_ROOT}"/etc/gridware.rc
+}
+
+setup
+require files
+require handler
+
+main "$@"

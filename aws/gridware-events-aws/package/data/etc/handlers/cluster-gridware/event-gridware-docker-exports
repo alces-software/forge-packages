@@ -1,0 +1,53 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+  local candidate_image candidate_image_id installed_images r
+
+  local r
+  r=$(type -p docker)
+  if [ $? == 0 ] && [ -x "$r" ]; then
+    # only if docker is installed and executable
+    installed_images=$(docker images --no-trunc --format='{{.ID}}' | sed -e "s/sha256://" | tr '\n' ' ')
+
+    for candidate_image in "${cw_GRIDWARE_root:-/opt/gridware}/docker/exports/"*; do
+      candidate_image_id=$(basename "$candidate_image")
+      if [[ "$installed_images" != *"$candidate_image_id"* ]]; then
+        log "Importing Docker image $candidate_image_id"
+        docker load -i "$candidate_image"
+      fi
+    done
+
+  fi
+
+
+}
+
+setup
+require log
+require handler
+require files
+
+files_load_config gridware
+
+handler_tee main "$@"

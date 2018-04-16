@@ -1,0 +1,57 @@
+#!/bin/bash
+
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.vars.sh
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/cluster-sge.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}
+
+if [ -f "${cw_ROOT}/etc/cluster-sge.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-sge.rc"
+fi
+
+name="$1"
+domainname="$(hostname -d)"
+if [[ "${name}" != *"."* ]]; then
+    # name is simply "<hostname>"
+    short_name="${name}"
+    name="${name}.${domainname}"
+else
+    if [[ "${name}" != *".${domainname}" ]]; then
+        # name is "<hostname>.<subdomain>"
+        name="$1.${domainname}"
+    fi
+    short_name=$(echo ${name} | cut -f1 -d'.')
+fi
+
+tmpfile="$(mktemp /tmp/sge-prune-node.XXXXXXXX)"
+
+if _lock; then
+    set -o pipefail
+    # Remove any existing record from all hostgroups
+    for a in $(qconf -shgrpl); do
+        if qconf -shgrp ${a} | grep -q "${name}"; then
+            qconf -shgrp ${a} | \
+              sed -e "s/^\(.*\) ${name}\(.*\)/\1\2/g" | \
+              tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+              sed -e "s/hostlist\s*$/hostlist NONE/g" > "${tmpfile}" && \
+                qconf -Mhgrp "${tmpfile}"
+        fi
+    done
+    set +o pipefail
+else
+    echo "Locking failed; unable to prune ${short_name} from hostgroups files"
+fi
+
+qconf -de "${name}"
+
+rm -f "${tmpfile}"

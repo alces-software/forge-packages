@@ -1,0 +1,8 @@
+################################################################################
+##
+## Alces Clusterware - Shell configuration
+## Copyright (c) 2016 Alces Software Ltd
+##
+################################################################################
+cw_CLUSTER_TORQUE_log=/var/log/clusterware/cluster-torque.log
+cw_CLUSTER_TORQUE_cleanup_on_leave=true

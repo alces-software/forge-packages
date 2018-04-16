@@ -1,0 +1,13 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "domain-networking-aws",
+    "version": "2.0.0-dev",
+    "summary": "Domain networking support for AWS-based clusters",
+    "username": "alces",
+    "dependencies": [
+      "alces/core-events-aws",
+      "alces/clusterware-events"
+    ]
+  }
+}

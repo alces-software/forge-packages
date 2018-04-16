@@ -1,0 +1,19 @@
+: '
+: SYNOPSIS: AWS configuration for this compute environment
+: HELP: Display information regarding the AWS configuration of this instance.
+: '
+################################################################################
+##
+## Alces Clusterware - Metadata file
+## Copyright (c) 2016 Alces Software Ltd
+##
+################################################################################
+require files
+if files_load_config --optional instance-aws config/cluster; then
+    cw_META_aws_machine_type_desc="Machine type"
+    cw_META_aws_machine_type="${cw_INSTANCE_aws_machinetype}"
+    cw_META_aws_instanceid_desc="Instance ID"
+    cw_META_aws_instanceid="${cw_INSTANCE_aws_instanceid}"
+    cw_META_aws_account_hash_desc="Account hash"
+    cw_META_aws_account_hash="${cw_INSTANCE_aws_account_hash}"
+fi

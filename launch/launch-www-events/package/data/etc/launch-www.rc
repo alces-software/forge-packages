@@ -1,0 +1,7 @@
+################################################################################
+##
+## Alces Clusterware - Shell configuration
+## Copyright (c) 2016-2018 Alces Software Ltd
+##
+################################################################################
+cw_CLUSTER_WWW_redirect_url_template=https://launch.alces-flight.com/cluster/_HOSTNAME_

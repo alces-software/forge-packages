@@ -1,0 +1,50 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+  local a xdg_config
+  IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+  for a in "${xdg_config[@]}"; do
+      if [ -e "${a}"/clusterware/config.vars.sh ]; then
+          source "${a}"/clusterware/config.vars.sh
+          break
+      fi
+  done
+  if [ -z "${cw_ROOT}" ]; then
+      echo "$0: unable to locate clusterware configuration"
+      exit 1
+  fi
+  kernel_load
+}
+
+main() {
+  local hostname shortname groupname
+
+  if [ "${cw_CLUSTERABLE_manage_genders}" == "true" ]; then
+    hostname="$1"
+    groupname="$2"
+    shortname="$(echo "${hostname}" | cut -f1 -d".")"
+    if [ -f "${cw_ROOT}"/etc/genders ]; then
+      if files_lock "clusterable"; then
+          echo "${shortname} group=${groupname}" >> "${cw_ROOT}"/etc/genders
+          files_unlock
+      else
+          echo "Locking failed; unable to update genders file for ${hostname}"
+      fi
+    fi
+  fi
+}
+
+setup
+
+require handler
+require files
+
+files_load_config --optional clusterable
+cw_CLUSTERABLE_manage_genders=${cw_CLUSTERABLE_manage_genders:-true}
+
+handler_tee main "$@"

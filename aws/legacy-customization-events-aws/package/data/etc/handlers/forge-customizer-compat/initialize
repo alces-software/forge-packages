@@ -1,0 +1,141 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Clusterware.
+#
+# Alces Clusterware is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Alces Clusterware is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Alces Clusterware, please visit:
+# https://github.com/alces-software/clusterware
+#==============================================================================
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_run_initialize_hooks() {
+    local p args a
+    for p in ${cw_CLUSTER_CUSTOMIZER_path}/*; do
+        if [ -d "${p}"/initialize.d ]; then
+            args=()
+            if [ ! -d "${cw_ROOT}"/etc/config ]; then
+                args+=(once)
+            fi
+            for a in "${p}"/initialize.d/*; do
+                if [ -x "$a" -a ! -d "$a" ] && [[ "$a" != *~ ]]; then
+                    echo "Running initialize hook: ${a}"
+                    "${a}" "initialize" "${args[@]}"
+                elif [[ "$a" != *~ ]]; then
+                    echo "Skipping non-executable initialize hook: ${a}"
+                fi
+            done
+        else
+            echo "No initialize hooks found in ${p}"
+        fi
+    done
+}
+
+_setup_account_profiles() {
+    local o_profiles o_bucket customizer_data
+    customizer_data="$1"
+
+    o_profiles="${cw_CLUSTER_CUSTOMIZER_account_profiles}"
+    o_bucket="${cw_CLUSTER_CUSTOMIZER_bucket}"
+    cw_CLUSTER_CUSTOMIZER_bucket=$(echo "${customizer_data}" | cut -f2 -s -d' ')
+    cw_CLUSTER_CUSTOMIZER_account_profiles=$(echo "${customizer_data}" | cut -f3- -s -d' ')
+    if [[ "$cw_CLUSTER_CUSTOMIZER_bucket" != "" && "$cw_CLUSTER_CUSTOMIZER_bucket" != "s3://"* ]]; then
+        cw_CLUSTER_CUSTOMIZER_account_profiles="${cw_CLUSTER_CUSTOMIZER_bucket} ${cw_CLUSTER_CUSTOMIZER_account_profiles}"
+        cw_CLUSTER_CUSTOMIZER_bucket=""
+    fi
+    if [ "${cw_CLUSTER_CUSTOMIZER_bucket}" ]; then
+        sed -i -e "s,^#\?cw_CLUSTER_CUSTOMIZER_bucket=.*,cw_CLUSTER_CUSTOMIZER_bucket=\"${cw_CLUSTER_CUSTOMIZER_bucket}\",g" \
+            "${cw_ROOT}"/etc/cluster-customizer.rc
+    else
+        cw_CLUSTER_CUSTOMIZER_bucket="${o_bucket}"
+    fi
+    if [ "${cw_CLUSTER_CUSTOMIZER_account_profiles}" ]; then
+        sed -i -e "s,^#\?cw_CLUSTER_CUSTOMIZER_account_profiles=.*,cw_CLUSTER_CUSTOMIZER_account_profiles=\"${cw_CLUSTER_CUSTOMIZER_account_profiles}\",g" \
+            "${cw_ROOT}"/etc/cluster-customizer.rc
+    else
+        cw_CLUSTER_CUSTOMIZER_account_profiles="${o_profiles}"
+    fi
+}
+
+_setup() {
+  local account_profile_data userdata
+
+  userdata=$(network_fetch_ec2_userdata 1)
+
+  account_profile_data=$(echo "${userdata}" | egrep "^#=Flight(Profiles|Customizer) ")
+  if [ "${account_profile_data}" ]; then
+    account_profile_data="${account_profile_data%"${account_profile_data##*[![:space:]]}"}"
+    _setup_account_profiles "${account_profile_data}"
+  fi
+}
+
+_has_connectivity() {
+  "${cw_ROOT}"/libexec/share/connectivity-check "$@" &>/dev/null
+}
+
+_wait_for_internet() {
+    local c
+    c=0
+    while ! _has_connectivity; do
+        c=$(($c+1))
+        if [ "$c" -gt 49 ]; then
+            echo "Giving up after 50 attempts."
+            return 1
+        fi
+        echo "No access to Internet available; will retry in 5s (attempt ${c}/50)"
+        sleep 5
+    done
+}
+
+main() {
+  if network_has_metadata_service 1; then
+    _setup
+  fi
+  if _wait_for_internet; then
+    customize_fetch
+  else
+    echo "WARNING! No access to download customizations, no customization will occur."
+  fi
+  _run_initialize_hooks
+}
+
+setup
+require handler
+require files
+require network
+require customize
+require ruby
+
+files_load_config cluster-customizer
+cw_CLUSTER_CUSTOMIZER_account_profiles="${cw_CLUSTER_CUSTOMIZER_account_profiles:-${cw_CLUSTER_CUSTOMIZER_profiles:-default}}"
+
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

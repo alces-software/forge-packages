@@ -1,0 +1,62 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_SERF_PORT="7947"
+
+main() {
+    if ! iptables -C INPUT -p udp --dport 5353 -d 224.0.0.251 -j ACCEPT &>/dev/null; then
+        echo "Adding iptables rule: -I INPUT -p udp --dport 5353 -d 224.0.0.251 -j ACCEPT"
+        iptables -I INPUT -p udp --dport 5353 -d 224.0.0.251 -j ACCEPT
+    else
+        echo "iptables rule already exists: -I INPUT -p udp --dport 5353 -d 224.0.0.251 -j ACCEPT"
+    fi
+    if ! iptables -C INPUT -p udp --sport 5353 -j ACCEPT &>/dev/null; then
+        echo "Adding iptables rule: -I INPUT -p udp --sport 5353 -j ACCEPT"
+        iptables -I INPUT -p udp --sport 5353 -j ACCEPT
+    else
+        echo "iptables rule already exists: -I INPUT -p udp --sport 5353 -j ACCEPT"
+    fi
+    if ! iptables -C INPUT -p tcp --dport ${_SERF_PORT} -j ACCEPT &>/dev/null; then
+        echo "Adding iptables rule: -I INPUT -p tcp --dport ${_SERF_PORT} -j ACCEPT"
+        iptables -I INPUT -p tcp --dport ${_SERF_PORT} -j ACCEPT
+    else
+        echo "iptables rule already exists: -I INPUT -p tcp --dport ${_SERF_PORT} -j ACCEPT"
+    fi
+    if ! iptables -C INPUT -p udp --dport ${_SERF_PORT} -j ACCEPT &>/dev/null; then
+        echo "Adding iptables rule: -I INPUT -p udp --dport ${_SERF_PORT} -j ACCEPT"
+        iptables -I INPUT -p udp --dport ${_SERF_PORT} -j ACCEPT
+    else
+        echo "iptables rule already exists: -I INPUT -p udp --dport ${_SERF_PORT} -j ACCEPT"
+    fi
+    if distro_start_service clusterware-serf; then
+        echo "Clusterware Serf service started"
+    else
+        echo "Unable to start Clusterware Serf service"
+    fi
+}
+
+setup
+require distro
+require handler
+
+handler_tee main "$@"

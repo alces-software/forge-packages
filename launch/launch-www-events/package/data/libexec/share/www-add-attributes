@@ -1,0 +1,95 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Clusterware.
+#
+# Alces Clusterware is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Alces Clusterware is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Alces Clusterware, please visit:
+# https://github.com/alces-software/clusterware
+#==============================================================================
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local config configWithVars newConfig hostname
+    config="$1"
+    if [ ! -f "$config" ]; then
+        echo "$0: could not read config file: ${config}"
+        exit 1
+    fi
+
+    files_load_config config config/cluster
+    files_load_config clusterware
+    files_load_config clusterware-www
+    files_load_config --optional access
+
+    hostname="${cw_ACCESS_fqdn:-$(network_get_public_hostname)}"
+    https_port=":${cw_WWW_https_port:-443}"
+    if [ "${https_port}" == ":443" ]; then
+        https_port=""
+    fi
+
+    configWithVars="$(mktemp /tmp/cluster-www.XXXXXXXX)"
+    newConfig="$(mktemp /tmp/cluster-www.XXXXXXXX)"
+
+    sed \
+        -e "s,_CLUSTERNAME_,${cw_CLUSTER_name},g" \
+        -e "s/_RELEASE_/${cw_RELEASE}/g" \
+        -e "s/_HOSTNAME_/${hostname}/g" \
+        -e "s/_HTTPS_PORT_/${https_port}/g" \
+        -e "s/_IP_/$(network_get_public_address)/g" \
+        -e "s,_ROOT_,${cw_ROOT},g" \
+        "${config}" \
+        > "${configWithVars}"
+
+    $_JQ -s \
+        ' .[0].data.id as $id |
+          .[0].data.type as $type |
+          .[0].data.attributes + .[1] |
+          {data: {id: $id, type: $type, attributes: . }}' \
+        "${cw_ROOT}"/var/lib/clusterware-www/launch/www/index.json \
+        "${configWithVars}" \
+        > "${newConfig}"
+
+    chmod a+r "${newConfig}"
+    mv "${newConfig}" "${cw_ROOT}"/var/lib/clusterware-www/launch/www/index.json
+
+    distro_restart_service clusterware-www
+}
+
+setup
+
+require ruby
+require files
+require network
+require distro
+
+_JQ="${cw_ROOT}"/opt/jq/bin/jq
+
+main "$@"

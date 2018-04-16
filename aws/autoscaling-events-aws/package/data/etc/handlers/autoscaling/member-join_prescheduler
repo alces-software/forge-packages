@@ -1,0 +1,117 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+
+_get_autoscaling_group_maxsize() {
+    local group
+    group="$1"
+    "${_AWS}" --region "${cw_INSTANCE_aws_region}" \
+              autoscaling describe-auto-scaling-groups | \
+        "${_JQ}" ".AutoScalingGroups | map(select(.AutoScalingGroupName==\"${group}\")) | .[] | .MaxSize"
+}
+
+_dereference_group_label() {
+  local label
+  label="$1"
+  if [ -e "${cw_ROOT}/etc/config/autoscaling/by-label/${label}" ]; then
+    basename `readlink "${cw_ROOT}/etc/config/autoscaling/by-label/${label}"`
+  fi
+}
+
+main() {
+    if files_load_config --optional instance-aws config/cluster; then
+        eval "$(member_parse)"
+        log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+        scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+        if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+            autoscaling_group=$(member_find_tag "autoscaling_group" "${cw_MEMBER_tags}")
+            if [ "${autoscaling_group}" ]; then
+
+              autoscaling_group_cores=$(member_find_tag "autoscaling_group_cores" "${cw_MEMBER_tags}")
+              autoscaling_group_ram_mib=$(member_find_tag "autoscaling_group_ram_mib" "${cw_MEMBER_tags}")
+              autoscaling_group_maxsize=$(_get_autoscaling_group_maxsize "${autoscaling_group}")
+              autoscaling_group_label=$(member_find_tag "autoscaling_group_label" "${cw_MEMBER_tags}")
+
+              mkdir -p "${cw_ROOT}/etc/config/autoscaling/by-label"
+
+              existing_group_with_our_label=$(_dereference_group_label "${autoscaling_group_label}")
+              if [[ "$existing_group_with_our_label" != "" && "$existing_group_with_our_label" != "$autoscaling_group" ]]; then
+                log "Conflicting autoscaling group label ${autoscaling_group_label}, deduplicating."
+                dedupe_attempt=2
+                while true; do
+                  existing_group_with_our_label=$(_dereference_group_label "${autoscaling_group_label}${dedupe_attempt}")
+                  if [[ "$existing_group_with_our_label" == "" || "$existing_group_with_our_label" == "$autoscaling_group" ]]; then
+                    # We've either found an unused label or we've found our actual group
+                    break
+                  fi
+                  let dedupe_attempt=dedupe_attempt+1
+                done
+                autoscaling_group_label=${autoscaling_group_label}${dedupe_attempt}
+
+              fi
+
+              if [[ "$autoscaling_group_label" == "" ]]; then
+                log "Autoscaling group has no label, using group name instead"
+                autoscaling_group_label=$autoscaling_group
+              fi
+
+              if [ ! -e "${cw_ROOT}/etc/config/autoscaling/by-label/${autoscaling_group_label}" ]; then
+                log "New autoscaling group: ${autoscaling_group_label} => ${autoscaling_group}"
+                ln -s "${cw_ROOT}/etc/config/autoscaling/groups/${autoscaling_group}" "${cw_ROOT}/etc/config/autoscaling/by-label/${autoscaling_group_label}"
+              fi
+
+              if [ ! -d "${cw_ROOT}/etc/config/autoscaling/groups/${autoscaling_group}" ]; then
+                # This is the first time we've seen this group
+                mkdir -p "${cw_ROOT}/etc/config/autoscaling/groups/${autoscaling_group}"
+
+                if [ ! -e "${cw_ROOT}/etc/config/autoscaling/default" ]; then
+                  ln -s "${cw_ROOT}/etc/config/autoscaling/by-label/${autoscaling_group_label}" "${cw_ROOT}/etc/config/autoscaling/default"
+                fi
+
+                log "Triggering local 'autoscaling-add-group' event with: ${autoscaling_group_label} ${autoscaling_group_maxsize} ${autoscaling_group_cores} ${autoscaling_group_ram_mib}"
+                "${cw_ROOT}"/libexec/share/trigger-event --local autoscaling-add-group "${autoscaling_group_label}" "${autoscaling_group_maxsize}" "${autoscaling_group_cores}" "${autoscaling_group_ram_mib}"
+              fi
+
+              log "Triggering local 'autoscaling-member-join' event with: ${cw_MEMBER_name} ${cw_MEMBER_ip} ${autoscaling_group_label} ${autoscaling_group_maxsize} ${autoscaling_group_cores} ${autoscaling_group_ram_mib}"
+              "${cw_ROOT}"/libexec/share/trigger-event --local autoscaling-member-join "${cw_MEMBER_name}" "${cw_MEMBER_ip}" "${autoscaling_group_label}" "${autoscaling_group_maxsize}" "${autoscaling_group_cores}" "${autoscaling_group_ram_mib}"
+
+              # Record this node's membership of the group
+              touch "${cw_ROOT}/etc/config/autoscaling/groups/${autoscaling_group}/${cw_MEMBER_name}"
+
+            fi
+        fi
+    fi
+}
+
+setup
+require handler
+require files
+require log
+require member
+
+_AWS="${cw_ROOT}"/opt/aws/bin/aws
+_JQ="${cw_ROOT}"/opt/jq/bin/jq
+
+log_set_default "/var/log/clusterware/autoscaler.log"
+
+handler_tee main "$@"

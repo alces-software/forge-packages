@@ -1,0 +1,61 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015-2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local a payload master_ip target_ip imports instance_ip
+
+    files_load_config instance config/cluster
+    if [ "${cw_INSTANCE_role}" == "slave" ]; then
+        files_lock cluster-nfs
+        payload=($(cat))
+        log "Received payload from master: ${payload[*]}" "${cw_CLUSTER_NFS_log}"
+        master_ip="${payload[1]}"
+        target_ip="${payload[2]}"
+        imports="${payload[@]:3}"
+        log "Parsed payload as: master: ${master_ip}, target: ${target_ip}, imports: ${imports}" \
+            "${cw_CLUSTER_NFS_log}"
+
+        instance_ip="$(network_get_network_address ${master_ip})"
+        log "Instance IP is: ${instance_ip}" "${cw_CLUSTER_NFS_log}"
+
+        if [ "${instance_ip}" == "${target_ip}" ]; then
+            for a in $imports; do
+                test -f $a || mkdir -p $a
+                log "Mounting export: ${master_ip}:$a" "${cw_CLUSTER_NFS_log}"
+                mount -t nfs -o _netdev,bg,intr,vers=3 $master_ip:$a $a
+            done
+        fi
+        files_unlock
+    fi
+}
+
+setup
+require network
+require log
+require handler
+require files
+
+files_load_config --optional cluster-nfs
+cw_CLUSTER_NFS_log="${cw_CLUSTER_NFS_log:-/var/log/clusterware/cluster-nfs.log}"
+
+handler_tee main "$@"

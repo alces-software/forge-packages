@@ -1,0 +1,76 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_initialize_gridware() {
+    local hook_dir
+    hook_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    "${hook_dir}"/share/initialize-gridware
+}
+
+_notify_depots() {
+    local depots depot_name depot_id depot_path exports
+
+    files_load_config gridware
+    depots=()
+    exports=()
+    for a in ${cw_GRIDWARE_root:-/opt/gridware}/*; do
+        if [ -L "$a" ]; then
+            depot_name=$(basename $a)
+            depot_path=$(readlink $a)
+            depot_id=$(basename ${depot_path})
+            if [[ "${cw_GRIDWARE_depots_disabled}" == *":${depot_name}:"* ]]; then
+                depot_state="disabled"
+            else
+                depot_state="enabled"
+            fi
+            depots+=(${depot_id}:${depot_name}:${depot_state})
+            exports+=("${depot_path}")
+        fi
+    done
+    if [ "${depots}" ]; then
+        handler_run_hook nfs-export "${cw_GRIDWARE_root:-/opt/gridware}/etc" "${cw_GRIDWARE_root:-/opt/gridware}/data" "${exports[@]}"
+        handler_broadcast gridware-depots ${depots[*]}
+    fi
+}
+
+main() {
+    files_load_config instance config/cluster
+    if [ "${cw_INSTANCE_role}" == "master" ]; then
+        files_load_config gridware config/gridware
+        files_load_config gridware
+        if [ "${cw_GRIDWARE_trigger:-immediate}" == 'delayed' ]; then
+            _initialize_gridware
+            _notify_depots
+            # Rewrite cw_GRIDWARE_trigger to 'immediate' to trigger on
+            # future member-join events.
+            sed -i -e 's/^cw_GRIDWARE_trigger=.*/cw_GRIDWARE_trigger="immediate"/g' \
+                "${cw_ROOT}"/etc/config/gridware/gridware.rc
+        fi
+    fi
+}
+
+setup
+require handler
+require files
+
+handler_tee main "$@"

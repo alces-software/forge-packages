@@ -1,0 +1,43 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+if [ "$1" == "--offline" ]; then
+    offline=true
+    shift
+fi
+name="$1"
+slots="$2"
+
+domainname="$(hostname -d)"
+if [[ "${name}" != *"."* ]]; then
+    # name is simply "<hostname>"
+    short_name="${name}"
+    name="${name}.${domainname}"
+else
+    if [[ "${name}" != *".${domainname}" ]]; then
+        # name is "<hostname>.<subdomain>"
+        name="$1.${domainname}"
+    fi
+    short_name=$(echo ${name} | cut -f1 -d'.')
+fi
+mkdir -p "${cw_ROOT}"/var/lock
+exec 9> "${cw_ROOT}"/var/lock/cluster-torque.lock && flock -w30 9
+# Add entry to server_priv/nodes
+LD_LIBRARY_PATH="${cw_ROOT}"/opt/torque/lib:$LD_LIBRARY_PATH
+if grep -q "^${name} " /var/spool/torque/server_priv/nodes; then
+    echo "${name} is already registered to cluster"
+else
+    echo "Adding ${name} to cluster"
+    "${cw_ROOT}"/opt/torque/bin/qmgr -c "create node ${name} np=${slots:-1}"
+fi
+exec 9>&-
+if [ "$offline" == "true" ]; then
+    (
+        sleep 10
+        "${cw_ROOT}"/opt/torque/bin/qmgr -c "set node ${name} state=offline"
+    ) </dev/null &>/dev/null &
+fi

@@ -1,0 +1,143 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015-2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_update_ssh_shosts() {
+    local ip
+    ip="$1"
+    if [ "${cw_CLUSTERABLE_manage_ssh_config}" == "true" ]; then
+        if ! grep -q "^${ip}$" /root/.shosts 2>/dev/null; then
+            echo "Adding IP address to shosts: $ip"
+            echo "${ip}" >> /root/.shosts
+        fi
+    fi
+}
+
+_update_ssh_known_hosts() {
+    local ip ssh_host_names
+    ip="$1"
+    if [ "${cw_CLUSTERABLE_manage_ssh_host_keys}" == "true" ]; then
+        ssh_host_names="$(getent hosts ${ip} | tr -s ' ' ',')"
+        if ! grep -q "^${ssh_host_names} " /etc/ssh/ssh_known_hosts 2>/dev/null; then
+            echo "Adding SSH host keys for: $ip"
+            ssh-keyscan "${ssh_host_names}" >> /etc/ssh/ssh_known_hosts
+        fi
+    fi
+}
+
+_update_genders() {
+    local name
+    name="$(echo "${cw_MEMBER_name}" | cut -f1 -d".")"
+    if [ "${cw_CLUSTERABLE_manage_genders}" == "true" ]; then
+        if [ -f "${cw_ROOT}"/etc/genders ]; then
+            echo "Updating genders to add slave: ${cw_MEMBER_ip}"
+            if ! grep -q "^${name} " "${cw_ROOT}"/etc/genders; then
+                if files_lock "clusterable"; then
+                    echo "${name} nodes,compute,cluster,slave,all" >> "${cw_ROOT}"/etc/genders
+                    files_unlock
+                else
+                    echo "Locking failed; unable to update genders file for ${name}"
+                fi
+            fi
+        fi
+    fi
+}
+
+_sync_storage() {
+  if type -t storage_broadcast_enabled 2>/dev/null; then
+    files_load_config instance config/cluster
+    if [[ "${cw_INSTANCE_role}" == "master" ]]; then
+        echo "Synchronizing storage backends and system-wide configuration to slave: ${cw_MEMBER_ip}"
+        storage_broadcast_enabled
+        storage_sync_to_slaves "${cw_MEMBER_ip}"
+        storage_sync_to_slaves --default "${cw_MEMBER_ip}"
+    fi
+  fi
+}
+
+_record_join() {
+  if [ -x "${cw_ROOT}"/libexec/share/flight-recorder ]; then
+    local instance_id machine_type
+    instance_id=$(member_find_tag aws_instanceid "${cw_MEMBER_tags}")
+    if [ "${instance_id}" ]; then
+        machine_type=$(member_find_tag aws_machinetype "${cw_MEMBER_tags}")
+        "${cw_ROOT}"/libexec/share/flight-recorder "join" "${instance_id}" "${cw_MEMBER_role}" "${machine_type}"
+    else
+        instance_id=$(member_find_tag generic_systemid "${cw_MEMBER_tags}")
+        if [ "${instance_id}" ]; then
+            machine_type=$(member_find_tag generic_machinetype "${cw_MEMBER_tags}")
+            "${cw_ROOT}"/libexec/share/flight-recorder "join" \
+                        "${instance_id}" "${cw_MEMBER_role}" "${machine_type}"
+        fi
+    fi
+  fi
+}
+
+_check_quoracy() {
+    local count
+    count="$(member_count)"
+    if [ "${count}" -ge "$(member_quorum)" ]; then
+        handler_run_hook cluster-quorate "${count}"
+    fi
+}
+
+_update_hosts() {
+    if [ "${cw_CLUSTERABLE_manage_etc_hosts}" == "true" ]; then
+        "${cw_ROOT}"/libexec/share/update-etc-hosts "${cw_MEMBER_name}" "${cw_MEMBER_ip}"
+    fi
+}
+
+main() {
+    local member_data
+    member_data="$(cat)"
+    member_register <<< "${member_data}"
+    eval $(member_parse <<< "${member_data}")
+
+    _check_quoracy
+    _record_join
+    _update_hosts
+    if [ "${cw_MEMBER_role}" == "master" ]; then
+        _update_ssh_shosts "${cw_MEMBER_ip}"
+    else
+        _update_genders
+    fi
+    _update_ssh_known_hosts "${cw_MEMBER_ip}" "${cw_MEMBER_name}"
+    _sync_storage
+}
+
+setup
+
+require member
+require handler
+require files
+# The 'storage' function library may not be installed, so we suppress
+# error output here and code around the presence or absence where it's
+# used above.
+require storage &>/dev/null
+
+files_load_config --optional clusterable
+cw_CLUSTERABLE_manage_etc_hosts=${cw_CLUSTERABLE_manage_etc_hosts:-true}
+cw_CLUSTERABLE_manage_genders=${cw_CLUSTERABLE_manage_genders:-true}
+cw_CLUSTERABLE_manage_ssh_host_keys=${cw_CLUSTERABLE_manage_ssh_host_keys:-true}
+cw_CLUSTERABLE_manage_ssh_config=${cw_CLUSTERABLE_manage_ssh_config:-true}
+
+handler_tee main "$@"

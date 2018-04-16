@@ -1,0 +1,93 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_setup_certs() {
+    export HOME="${HOME:-/root}"
+    mkdir -p "${cw_ROOT}"/etc/openvpn/clusterware/
+    openssl dhparam -out "${cw_ROOT}"/etc/openvpn/clusterware/dh1024.pem -2 1024
+    ruby_exec "$(handler_dir)"/share/generate-certs "${cw_CLUSTER_name:-mycluster}" \
+      "${cw_ROOT}/etc/openvpn/clusterware"
+}
+
+main() {
+    local dir password
+
+    # Bail out if we're already configured (this is a reboot)
+    if [ -d "${cw_ROOT}/etc/config/cluster-vpn" ]; then
+        exit 0
+    fi
+
+    mkdir -p "${cw_ROOT}/etc/config/cluster-vpn"
+
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_role}" == "master" ]]; then
+        files_load_config config config/cluster
+        _setup_certs
+        cp "${cw_ROOT}"/etc/openvpn/clusterware/ca.crt.pem "${cw_ROOT}"/etc/openvpn/client/clusterware
+        mv "${cw_ROOT}"/etc/openvpn/clusterware/client.*.pem "${cw_ROOT}"/etc/openvpn/client/clusterware
+
+        dir="$(handler_dir)"
+        cp "${dir}"/etc/meta.vpn.rc "${cw_ROOT}"/etc/meta.d/vpn.rc
+
+        # If clusterware-www handler is enabled we add in config so requests to
+        # `/vpn/` will provide access to the VPN configuration files.
+        if handler_is_enabled launch-www; then
+
+            # XXX This method of determining the URL to redirect to is
+            # duplicated from launch-www/configure.  Figure out a way to
+            # remove this duplication.
+            local redirectUrl host
+            files_load_config --optional access
+            files_load_config --optional clusterware-www
+            host="${cw_ACCESS_fqdn:-$(network_get_public_hostname)}"
+            redirectUrl=$(
+            echo "${cw_WWW_redirect_url_template:-https://manage.alces-flight.com/cluster/_HOSTNAME_}" \
+                | sed -e "s,_HOSTNAME_,${host},g"
+            )
+
+            sed -e "s,_ROOT_,${cw_ROOT},g" -e "s,_REDIRECT_URL_,${redirectUrl},g" \
+                "${dir}"/etc/clusterware-www/cluster-vpn.conf.template > \
+                "${cw_ROOT}"/etc/clusterware-www/server-https.d/cluster-vpn.conf
+            mkdir -p "${cw_ROOT}"/etc/clusterware-www/auth
+            password=$(dd if=/dev/urandom bs=20 count=1 2>/dev/null | base64 | tr '/+' '_' | cut -c1-10)
+            echo "vpn:$(echo "${password}" | openssl passwd -stdin)" > \
+                 "${cw_ROOT}"/etc/clusterware-www/auth/cluster-vpn.auth
+            echo "cw_CLUSTER_VPN_access_password=\"${password}\"" >> "${cw_ROOT}"/etc/cluster-vpn.rc
+
+            "${cw_ROOT}"/libexec/share/www-add-attributes "${dir}"/var/clusterware-www/vpn/attributes.json.tpl
+
+            mkdir -p "${cw_ROOT}/var/lib/clusterware-www/flight/vpn"
+            ln -s "${cw_ROOT}"/etc/openvpn/client "${cw_ROOT}/var/lib/clusterware-www/flight/vpn/downloads"
+        fi
+    fi
+}
+
+setup
+require handler
+require ruby
+require files
+require serviceware
+require network
+
+handler_tee main "$@"

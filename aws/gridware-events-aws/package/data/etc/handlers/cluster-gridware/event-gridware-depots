@@ -1,0 +1,59 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015-2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local a depots depot_meta depot_id depot_name depot_state
+
+    files_load_config instance config/cluster
+    if [ "${cw_INSTANCE_role}" == "slave" ]; then
+        payload=($(cat))
+        echo "Received payload from master: ${payload[*]}"
+        depots="${payload[@]:1}"
+	files_load_config distro
+        # respect locks established by cluster-nfs handler
+        files_lock cluster-nfs
+        for a in $depots; do
+            IFS=':' read -a depot_meta <<< "${a}"
+            depot_id="${depot_meta[0]}"
+            depot_name="${depot_meta[1]}"
+            depot_state="${depot_meta[2]}"
+            echo "Found depot: id: ${depot_id}, name: ${depot_name}, state: ${depot_state}"
+            mkdir -p "/opt/gridware/depots/${depot_id}"
+            ln -snf "/opt/gridware/depots/${depot_id}" "/opt/gridware/${depot_name}"
+            export HOME=${HOME:-/tmp}
+            if [ "${depot_state}" == "enabled" ]; then
+                "${cw_ROOT}"/bin/alces gridware depot enable ${depot_name}
+            else
+                "${cw_ROOT}"/bin/alces gridware depot disable ${depot_name}
+            fi
+        done
+        files_unlock
+    fi
+}
+
+setup
+require log
+require handler
+require files
+
+handler_tee main "$@"

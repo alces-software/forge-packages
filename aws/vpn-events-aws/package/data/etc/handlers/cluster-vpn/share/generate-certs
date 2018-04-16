@@ -1,0 +1,74 @@
+################################################################################
+##
+## Alces Clusterware - Handler helper script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+require 'openssl'
+
+def generate_ca_cert(cn, ca_key)
+  subject = "/C=GB/O=Alces Software Ltd/OU=Alces Clusterware/CN=#{cn}"
+
+  base_cert(subject, ca_key).tap do |root_ca|
+    ef = OpenSSL::X509::ExtensionFactory.new
+    ef.subject_certificate = root_ca
+    ef.issuer_certificate = root_ca
+    root_ca.add_extension(ef.create_extension("basicConstraints","CA:TRUE",true))
+    root_ca.add_extension(ef.create_extension("keyUsage","keyCertSign, cRLSign", true))
+    root_ca.add_extension(ef.create_extension("subjectKeyIdentifier","hash",false))
+    root_ca.add_extension(ef.create_extension("authorityKeyIdentifier","keyid:always",false))
+    root_ca.sign(ca_key, OpenSSL::Digest::SHA256.new)
+  end
+end
+
+def generate_cert(cn, ca_cert, ca_key, key, type:)
+  subject = "/C=GB/O=Alces Software Ltd/OU=Alces Clusterware/CN=#{cn}"
+
+  base_cert(subject, key, ca_cert).tap do |cert|
+    ef = OpenSSL::X509::ExtensionFactory.new
+    ef.subject_certificate = cert
+    ef.issuer_certificate = ca_cert
+    case type
+    when :server
+      cert.add_extension(ef.create_extension("keyUsage","digitalSignature, keyEncipherment", true))
+      cert.add_extension(ef.create_extension("subjectKeyIdentifier","hash",false))
+      cert.add_extension(ef.create_extension("nsCertType","server",false))
+      cert.add_extension(ef.create_extension("extendedKeyUsage","serverAuth",false))
+    when :client
+      cert.add_extension(ef.create_extension("keyUsage","digitalSignature", true))
+      cert.add_extension(ef.create_extension("subjectKeyIdentifier","hash",false))
+      cert.add_extension(ef.create_extension("extendedKeyUsage","clientAuth",false))
+    else
+      raise "Unknown certificate type #{type}. Should be either :client or :server"
+    end
+    cert.sign(ca_key, OpenSSL::Digest::SHA256.new)
+  end
+end
+
+def base_cert(subject, key, issuer = nil)
+  OpenSSL::X509::Certificate.new.tap do |cert|
+    cert.version = 2 # cf. RFC 5280 - to make it a "v3" certificate
+    cert.serial = (rand * 10**28).to_i
+    cert.subject = OpenSSL::X509::Name.parse(subject)
+    cert.issuer = (issuer || cert).subject
+    cert.public_key = key.public_key
+    cert.not_before = Time.now - 3600
+    cert.not_after = cert.not_before + (3600 * 24 * 7 * 52 * 5)
+  end
+end
+
+cluster_name = ARGV[0] || 'cluster'
+output_dir = ARGV[1] || '/tmp'
+
+ca_key = OpenSSL::PKey::RSA.new(2048)
+ca_cert = generate_ca_cert("ca-#{cluster_name}", ca_key)
+server_key = OpenSSL::PKey::RSA.new(2048)
+server_cert = generate_cert("server-#{cluster_name}", ca_cert, ca_key, server_key, type: :server)
+client_key = OpenSSL::PKey::RSA.new(2048)
+client_cert = generate_cert("client-#{cluster_name}", ca_cert, ca_key, client_key, type: :client)
+
+File.write(File.join(output_dir,'ca.crt.pem'), ca_cert.to_pem)
+File.write(File.join(output_dir,'server.crt.pem'), server_cert.to_pem)
+File.write(File.join(output_dir,'server.key.pem'), server_key.to_pem, perm: 0600)
+File.write(File.join(output_dir,'client.crt.pem'), client_cert.to_pem)
+File.write(File.join(output_dir,'client.key.pem'), client_key.to_pem)

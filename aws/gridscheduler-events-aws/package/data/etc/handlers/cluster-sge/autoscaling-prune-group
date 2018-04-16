@@ -1,0 +1,45 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+  local groupname
+  groupname="$1"
+  log "Received autoscaling-prune-group for group ${groupname}"
+
+  if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+    handler_run_helper share/destroy-queues "${groupname}"
+    handler_run_helper share/destroy-parallel-environments "${groupname}"
+    handler_run_helper share/destroy-hostgroup "${groupname}"
+    log "Removed constructs for group ${groupname}."
+  fi
+}
+
+setup
+require handler
+require log
+require files
+
+files_load_config --optional cluster-sge
+files_load_config instance config/cluster
+log_set_default "${cw_CLUSTER_SGE_log:-/var/log/clusterware/cluster-sge.log}"
+handler_tee main "$@"

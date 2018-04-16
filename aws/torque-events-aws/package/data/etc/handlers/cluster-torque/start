@@ -1,0 +1,48 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    files_load_config cluster-torque
+    log_set_default "${cw_CLUSTER_TORQUE_log}"
+
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        echo "Starting master node TORQUE services (refer to ${cw_CLUSTER_TORQUE_log})"
+        files_lock cluster-torque
+        log "Starting TORQUE server"
+        distro_start_service clusterware-torque-server
+        sleep 2
+        log "Starting TORQUE scheduler"
+        distro_start_service clusterware-torque-sched
+        files_unlock
+    fi
+}
+
+setup
+require handler
+require log
+require distro
+require files
+
+handler_tee main "$@"

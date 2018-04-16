@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "set-admin-password",
+    "version": "2.0.0-dev",
+    "summary": "Set a randomized password for the admin user",
+    "dependencies": [
+    ]
+  }
+}

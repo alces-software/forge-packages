@@ -1,0 +1,197 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+  local a xdg_config
+  IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+  for a in "${xdg_config[@]}"; do
+    if [ -e "${a}"/clusterware/config.vars.sh ]; then
+      source "${a}"/clusterware/config.vars.sh
+      break
+    fi
+  done
+  if [ -z "${cw_ROOT}" ]; then
+    echo "$0: unable to locate clusterware configuration"
+    exit 1
+  fi
+  kernel_load
+}
+
+_unexhausted_nodes() {
+  # An "unexhausted" node will be spared from shooting, e.g. if it still has
+  # remaining billed-for runtime.
+  # We defer the identification of such nodes to a provider-specific method.
+  ${cw_INSTANCE_autoscaling}_unexhausted_nodes "$*"
+}
+
+_shoot_node() {
+  local exit_code
+  ${cw_INSTANCE_autoscaling}_shoot_node "$1" "$2"
+  exit_code=$?
+  return ${exit_code}
+}
+
+
+
+_empty_nodes() {
+  local scheduler empty_nodes
+  empty_nodes=()
+  for scheduler in "${_SCHEDULERS[@]}"; do
+    empty_nodes+=($(${scheduler}_empty_nodes))
+  done
+  if [ "${#_SCHEDULERS[@]}" -gt 1 ]; then
+    echo "${empty_nodes[@]}" | tr ' ' '\n' | sort | uniq -d | tr '\n' ' '
+  else
+    echo "${empty_nodes[@]}"
+  fi
+}
+
+_log_blob() {
+  local prefix
+  prefix="$1"
+  log_blob "" "autoscaler:${prefix}"
+}
+
+_scale_in() {
+  log "[autoscaler] Performing scale-in check"
+  # determine which nodes are viable to reap
+  # algorithm is:
+  #  - nodes that are currently empty
+  #  - nodes that have exhausted any paid-for runtime
+  empty_nodes="$(_empty_nodes)"
+  empty_nodes=($(echo "${empty_nodes}" | tr '\n' ' '))
+  log "[autoscaler:scale-in] Found empty nodes: ${empty_nodes[*]}"
+
+  # for each empty node, disable the queues while we're deciding
+  # whether we're going to shoot them or not.
+  for node in "${empty_nodes[@]}"; do
+    group=$(member_get_member_tag "${node}" "autoscaling_group")
+    if [ "${group}" ]; then
+      log "[autoscaler:scale-in] Disabling queues on ${node} (in group: ${group})"
+      # disable for each scheduler
+      for scheduler in "${_SCHEDULERS[@]}"; do
+        ${scheduler}_disable_node "${node}"
+      done
+    fi
+  done
+
+  unexhausted_nodes=" $(_unexhausted_nodes ${empty_nodes[@]}) "
+  for node in "${empty_nodes[@]}"; do
+    group=$(member_get_member_tag "${node}" "autoscaling_group")
+    if [ "${group}" ]; then
+      if [[ "$unexhausted_nodes" == *" $node "* ]]; then
+        # this node is not exhausted, reenable the queue
+        log "[autoscaler:scale-in] Enabling queues on ${node} (not exhausted)"
+        # enable for each scheduler
+        for scheduler in "${_SCHEDULERS[@]}"; do
+          ${scheduler}_enable_node "${node}"
+        done
+      else
+        log "[autoscaler:scale-in] Attempting to shoot node: ${node}"
+        if ! _shoot_node "${node}" "${group}"; then
+          log "[autoscaler:scale-in] Unable to shoot node, re-enabling queues"
+          # enable for each scheduler
+          for scheduler in "${_SCHEDULERS[@]}"; do
+            ${scheduler}_enable_node "${node}"
+          done
+        fi
+      fi
+    fi
+  done
+}
+
+_setup_schedulers() {
+  local a scheduler
+  _SCHEDULERS=()
+  for a in "${cw_ROOT}"/var/lib/scheduler/*; do
+    if [ -f "$a" ]; then
+      . "${a}"
+      scheduler=$(basename "$a" .functions.sh)
+      if type ${scheduler}_features &>/dev/null && \
+      [[ "$(${scheduler}_features)" == *':autoscaling:'* ]]; then
+        _SCHEDULERS+=(${scheduler})
+      fi
+    fi
+  done
+  log "[autoscaler:setup_schedulers] Found autoscaling-capable scheduler(s): ${_SCHEDULERS[*]}"
+}
+
+_setup_autoscaling() {
+  local autoscaling_provider_file
+
+  echo "Preconfigured autoscaling type is ${cw_INSTANCE_autoscaling}"
+  autoscaling_provider_file="${cw_HANDLER_PLUGINDIR}/autoscaling/share/providers/${cw_INSTANCE_autoscaling}"
+
+  if [ -f "$autoscaling_provider_file" ]; then
+    . "$autoscaling_provider_file"
+  else
+    echo "Provider file ${autoscaling_provider_file} not found, cannot configure autoscaling."
+    exit 1
+  fi
+}
+
+_scale_out() {
+  local default_queue
+  if [ -h "${cw_ROOT}/etc/config/autoscaling/default" ]; then
+    default_queue=$(basename `readlink "${cw_ROOT}/etc/config/autoscaling/default"`)
+    log "[autoscaler:scale-out] Default autoscaling group is ${default_queue}"
+  fi
+  ${cw_INSTANCE_autoscaling}_scale_out
+}
+
+dereference_group_label() {
+  local label
+  label="$1"
+  if [ -e "${cw_ROOT}/etc/config/autoscaling/by-label/${label}" ]; then
+    basename `readlink "${cw_ROOT}/etc/config/autoscaling/by-label/${label}"`
+  fi
+}
+
+label_from_group() {
+  local label group
+  group="$1"
+  for label in "${cw_ROOT}/etc/config/autoscaling/by-label"/*; do
+    label_group=$(basename `readlink "${label}"`)
+    if [ "${label_group}" == "${group}" ]; then
+        echo "$(basename "${label}")"
+        return 0
+    fi
+  done
+  return 1
+}
+
+main() {
+  if files_load_config instance config/cluster; then
+    if [ "${cw_INSTANCE_autoscaling}" != "disabled" ]; then
+      _setup_schedulers
+      _setup_autoscaling
+      _scale_out
+      _scale_in
+    else
+      log "[autoscaler] Autoscaling is disabled"
+    fi
+  fi
+}
+
+setup
+
+require member
+require files
+require handler
+require log
+require ruby
+
+PATH=$PATH:/sbin
+
+_JO="${cw_ROOT}"/opt/jo/bin/jo
+_AWS="${cw_ROOT}"/opt/aws/bin/aws
+
+log_set_default "/var/log/clusterware/autoscaler.log"
+
+files_load_config instance config/cluster
+
+main "$@"

@@ -1,0 +1,151 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_openvpn_service_name() {
+    local name
+    name='clusterware-openvpn'
+    if distro_is el7 || distro_is ubuntu1604; then
+        name=${name}@clusterware
+    fi
+    echo "${name}"
+}
+
+_load_cluster_vpn_vars() {
+    files_load_config cluster-vpn
+    cw_CLUSTER_VPN_port=${cw_CLUSTER_VPN_port:-1194}
+    cw_CLUSTER_VPN_intf=${cw_CLUSTER_VPN_intf:-tun0}
+    cw_CLUSTER_VPN_cluster_intf=${cw_CLUSTER_VPN_cluster_intf:-$(network_get_first_iface)}
+    cw_CLUSTER_VPN_network=${cw_CLUSTER_VPN_network:-10.41.41.0/24}
+    cw_CLUSTER_VPN_auth=${cw_CLUSTER_VPN_auth:-cert}
+}
+
+_clean_conf_files() {
+    local tmpfile
+    tmpfile="$(mktemp /tmp/cluster-vpn.XXXXXXXX)"
+    egrep -v "^(client-cert-not-required$|username-as-common-name$|plugin )" \
+          "${cw_ROOT}"/etc/openvpn/clusterware.conf > "${tmpfile}"
+    cat "${tmpfile}" > "${cw_ROOT}"/etc/openvpn/clusterware.conf
+    egrep -v "^(cert |key |auth-user-pass$)" \
+          "${cw_ROOT}"/etc/openvpn/client/clusterware/client.conf > "${tmpfile}"
+    cat "${tmpfile}" > "${cw_ROOT}"/etc/openvpn/client/clusterware/client.conf
+    rm -f "${tmpfile}"
+}
+
+_update_auth_conf() {
+    case "${cw_CLUSTER_VPN_auth}" in
+        pam)
+            cat <<EOF >> "${cw_ROOT}"/etc/openvpn/clusterware.conf
+client-cert-not-required
+username-as-common-name
+plugin ${cw_ROOT}/opt/openvpn/lib/openvpn/plugins/openvpn-plugin-auth-pam.so login
+EOF
+            echo 'auth-user-pass' >> "${cw_ROOT}"/etc/openvpn/client/clusterware/client.conf
+            ;;
+        cert)
+            echo 'cert client.crt.pem' >> "${cw_ROOT}"/etc/openvpn/client/clusterware/client.conf
+            echo 'key client.key.pem' >> "${cw_ROOT}"/etc/openvpn/client/clusterware/client.conf
+            ;;
+        *)
+            echo "Unrecognized authentication method specified for cw_CLUSTER_VPN_auth: ${cw_CLUSTER_VPN_auth}"
+            return 1
+            ;;
+    esac
+}
+
+_update_network_conf() {
+    local cluster_network
+    if network_is_ec2; then
+        cluster_network=$(network_get_ec2_vpc_cidr_block)
+    else
+        cluster_network="$(network_get_iface_network ${cw_CLUSTER_VPN_cluster_intf})"
+    fi
+    # set: port, dev, server network, push route
+    sed -e "s,^port .*,port ${cw_CLUSTER_VPN_port},g" \
+        -e "s,^dev .*,dev ${cw_CLUSTER_VPN_intf},g" \
+        -e "s,^server .*,server ${cw_CLUSTER_VPN_network%/*} $(network_cidr_to_mask ${cw_CLUSTER_VPN_network#*/}),g" \
+        -e "s,^push .*,push \"route ${cluster_network%/*} $(network_cidr_to_mask ${cluster_network#*/})\",g" \
+        -i "${cw_ROOT}"/etc/openvpn/clusterware.conf
+
+    sed -e "s,^remote .*,remote $(network_get_public_address) ${cw_CLUSTER_VPN_port},g" \
+        -i "${cw_ROOT}"/etc/openvpn/client/clusterware/client.conf
+}
+
+_write_archives() {
+    local tblk_name workdir
+
+    files_load_config config config/cluster
+
+    pushd "${cw_ROOT}"/etc/openvpn/client &>/dev/null
+    tar czf clusterware-openvpn.tar.gz clusterware
+
+    workdir="$(mktemp -d /tmp/cluster-vpn.XXXXXXXX)"
+    mkdir "${workdir}"/zip
+    cp -R clusterware "${workdir}"/zip
+    mv "${workdir}"/zip/clusterware/client.conf "${workdir}"/zip/clusterware/client.ovpn
+    cd "${workdir}"/zip
+    zip -r "${cw_ROOT}"/etc/openvpn/client/clusterware-openvpn.zip clusterware
+
+    tblk_name="Alces Clusterware - ${cw_CLUSTER_name}".tblk
+    mkdir "${workdir}"/"${tblk_name}"
+    cp -R clusterware/* "${workdir}"/"${tblk_name}"
+    cd "${workdir}"
+    zip -r "${cw_ROOT}"/etc/openvpn/client/clusterware-tunnelblick.zip "${tblk_name}"
+
+    rm -rf "${workdir}"
+    popd &>/dev/null
+}
+
+_start_openvpn_service() {
+    if distro_start_service $(_openvpn_service_name); then
+        echo "Started OpenVPN service"
+        handler_iptables_insert INPUT -p tcp --dport ${cw_CLUSTER_VPN_port} -j ACCEPT
+        handler_iptables_insert FORWARD -i ${cw_CLUSTER_VPN_intf} -j ACCEPT
+        handler_iptables_insert FORWARD -o ${cw_CLUSTER_VPN_intf} -j ACCEPT
+        handler_iptables_insert POSTROUTING -t nat -s ${cw_CLUSTER_VPN_network} -o ${cw_CLUSTER_VPN_cluster_intf} -j MASQUERADE
+        sysctl net.ipv4.ip_forward=1
+    else
+        echo "Unable to start OpenVPN service"
+    fi
+}
+
+main() {
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_role}" == "master" ]]; then
+        _load_cluster_vpn_vars
+        _clean_conf_files
+        if _update_auth_conf; then
+            _update_network_conf
+            _write_archives
+            _start_openvpn_service
+        fi
+    fi
+}
+
+setup
+require handler
+require files
+require distro
+require network
+
+handler_tee main "$@"

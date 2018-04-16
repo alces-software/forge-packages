@@ -1,0 +1,28 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.rc
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+name="$1"
+domainname="$(hostname -d)"
+if [[ "${name}" != *"."* ]]; then
+    # name is simply "<hostname>"
+    short_name="${name}"
+    name="${name}.${domainname}"
+else
+    if [[ "${name}" != *".${domainname}" ]]; then
+        # name is "<hostname>.<subdomain>"
+        name="$1.${domainname}"
+    fi
+    short_name=$(echo ${name} | cut -f1 -d'.')
+fi
+
+qconf -as "${name}"

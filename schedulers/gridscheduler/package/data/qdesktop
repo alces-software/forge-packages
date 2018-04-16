@@ -1,0 +1,124 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2015 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Clusterware.
+#
+# Alces Clusterware is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Alces Clusterware is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Alces Clusterware, please visit:
+# https://github.com/alces-software/clusterware
+#==============================================================================
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_usage() {
+    echo "Usage: $0 [--runtime <minutes>] [<session>] [PARAMS...]"
+}
+
+main() {
+    local params tmr job_id rt_mins session_options
+
+    if [ "$1" == '--help' -o "$1" == '-h' ]; then
+        _usage
+        exit 0
+    fi
+
+    if [ -f "${cw_ROOT}/etc/qdesktop.rc" ]; then
+        . ${cw_ROOT}/etc/qdesktop.rc
+    fi
+
+    session_options=()
+    if [ "$1" == "--runtime" ]; then
+        rt_mins=$(($2+0))
+        if [ "$rt_mins" -gt 0 ]; then
+            cw_QDESKTOP_rt="$(($rt_mins*60))"
+            session_options=(--runtime ${rt_mins})
+        fi
+        shift 2
+    fi
+
+    cw_QDESKTOP_script=${cw_QDESKTOP_script:-${cw_ROOT}/libexec/gridscheduler/qdesktop-session}
+    cw_QDESKTOP_queue=${cw_QDESKTOP_queue:-byslot.q}
+    cw_QDESKTOP_vmem=${cw_QDESKTOP_vmem:-4G}
+    cw_QDESKTOP_rt=${cw_QDESKTOP_rt:-72:0:0}
+    cw_QDESKTOP_session_type=${1:-${cw_QDESKTOP_session_type:-default}}
+    cw_QDESKTOP_session_params=("${@:2}")
+    cw_QDESKTOP_timeout=${cw_QDESKTOP_timeout:-10}
+
+    if [ "${cw_QDESKTOP_log}" ]; then
+        params="${params} -o \"${cw_QDESKTOP_log}\""
+    fi
+
+    if [ "${cw_QDESKTOP_project}" ]; then
+        params="${params} -P ${cw_QDESKTOP_project}"
+    fi
+
+    echo -n "Starting \"${cw_QDESKTOP_session_type}\" session... "
+    if job_id=$(qsub -terse \
+        -now yes -q ${cw_QDESKTOP_queue} \
+        -l h_rt=${cw_QDESKTOP_rt} \
+        -l h_vmem=${cw_QDESKTOP_vmem} \
+        $params \
+        ${cw_QDESKTOP_script} \
+        "${session_options[@]}" \
+        ${cw_QDESKTOP_session_type} \
+        "${cw_QDESKTOP_session_params[@]}" 2>/dev/null); then
+        echo "Session request submitted (job ${job_id})."
+        echo -n "Awaiting start... "
+        cw_QDESKTOP_log=${cw_QDESKTOP_log:-${HOME}/qdesktop.${job_id}}
+        tmr=0
+        while [ ! -f "${cw_QDESKTOP_log}" ] || ! egrep -q '^(--START--|--FAIL--)' "${cw_QDESKTOP_log}" && [ $tmr -lt $cw_QDESKTOP_timeout ]; do
+            tmr=$(($tmr+1))
+            sleep 1
+        done
+        if [ -f "${cw_QDESKTOP_log}" ] && grep -q '^--START--' "${cw_QDESKTOP_log}"; then
+            echo "Session started."
+            echo ""
+            grep '^!' "${cw_QDESKTOP_log}" | cut -c2-
+        elif [ -f "${cw_QDESKTOP_log}" ] && grep -q '^--FAIL--' "${cw_QDESKTOP_log}"; then
+            echo "Session failed."
+            echo ""
+            grep '^!' "${cw_QDESKTOP_log}" | cut -c2-
+            grep '^alces ' "${cw_QDESKTOP_log}"
+            echo "$(basename $0): unable to start session - refer to ${cw_QDESKTOP_log}"
+            exit 3
+        else
+            echo "Timed out."
+            echo "$(basename $0): unable to determine access details - refer to ${cw_QDESKTOP_log}"
+            exit 2
+        fi
+    else
+        echo "Failed."
+        echo "$(basename $0): unable to request a session - cluster too busy?"
+        exit 1
+    fi
+}
+
+setup
+
+main "$@"

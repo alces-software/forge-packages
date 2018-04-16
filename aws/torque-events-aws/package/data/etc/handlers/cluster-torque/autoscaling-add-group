@@ -1,0 +1,57 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local group group_maxsize cores_per_node dummy_name a c d
+    group="$1"
+    group_maxsize="$2"
+    cores_per_node="$3"
+
+    files_load_config instance config/cluster
+
+    log "Performing deferred configuration for scaling group: ${group} (size: ${group_maxsize}, cores: ${cores_per_node})"
+    # We're autoscaling so we need to add some dummy nodes to
+    # represent the scaling group otherwise we're unable to scale-out.
+    # Block traffic between 169.254.64.0 -> 169.254.67.255
+    handler_iptables_insert OUTPUT -d 169.254.64.0/22 -j DROP
+    LD_LIBRARY_PATH="${cw_ROOT}"/opt/torque/lib:$LD_LIBRARY_PATH
+    for a in $(seq 1 ${group_maxsize}); do
+        dummy_name=autoscaling-slot-${group}-$a
+        log "Adding placeholder node: ${dummy_name} np=${cores_per_node}"
+        c=$((64 + $a / 256))
+        d=$(($a % 256))
+        "${cw_ROOT}"/libexec/share/update-etc-hosts "${dummy_name}" "169.254.${c}.${d}"
+        if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+            handler_run_helper share/add-node --offline ${dummy_name} ${cores_per_node} | log_blob
+        fi
+    done
+}
+
+setup
+require handler
+require files
+require log
+
+files_load_config --optional cluster-torque
+log_set_default "${cw_CLUSTER_TORQUE_log:-/var/log/clusterware/cluster-torque.log}"
+handler_tee main "$@"

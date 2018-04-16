@@ -1,0 +1,47 @@
+#!/bin/bash
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    # Bail out if we're already configured (this is a reboot)
+    if [ -d "${cw_ROOT}/etc/config/nfs" ]; then
+        exit 0
+    fi
+
+    mkdir -p "${cw_ROOT}/etc/config/nfs"
+
+    . ${cw_ROOT}/etc/config/cluster/instance.vars.sh
+    if [ "${cw_INSTANCE_role}" == "master" ]; then
+        distro_enable_service rpcbind
+        distro_start_service rpcbind
+        if distro_is el6; then
+            distro_enable_service nfs
+            distro_start_service nfs
+        else
+            distro_enable_service nfs-server
+            distro_start_service nfs-server
+        fi
+    elif [ "${cw_INSTANCE_role}" == "slave" ]; then
+        distro_enable_service rpcbind
+        distro_start_service rpcbind
+    fi
+}
+
+setup
+require distro
+require handler
+
+handler_tee main "$@"

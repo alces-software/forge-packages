@@ -1,0 +1,9 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "modules",
+    "version": "3.2.10+clusterware0",
+    "username": "alces",
+    "dependencies": []
+  }
+}

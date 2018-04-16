@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "www",
+    "version": "1.10.1+1clusterware0",
+    "summary": "Nginx web server for Clusterware",
+    "dependencies": [
+    ]
+  }
+}

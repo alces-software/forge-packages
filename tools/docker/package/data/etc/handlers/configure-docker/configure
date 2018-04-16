@@ -1,0 +1,107 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2017-2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Clusterware.
+#
+# Alces Clusterware is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Alces Clusterware is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Alces Clusterware, please visit:
+# https://github.com/alces-software/clusterware
+#==============================================================================
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local hook role
+    hook="$1"
+    role="$2"
+
+    if distro_is_repository_permitted docker; then
+        if ! distro_repository_exists docker; then
+            if distro_is el7; then
+                cat <<\REPO > "${cw_ROOT}"/etc/distro/repos/docker.sh
+#!/bin/bash
+if [ "$1" == "enable" ]; then
+    if [ ! -f /etc/yum.repos.d/docker.repo ]; then
+        cat <<\EOF > /etc/yum.repos.d/docker.repo
+[dockerrepo]
+name=Docker Repository
+baseurl=https://yum.dockerproject.org/repo/main/centos/7/
+enabled=1
+gpgcheck=1
+gpgkey=https://yum.dockerproject.org/gpg
+EOF
+    fi
+else
+    rm -f /etc/yum.repos.d/docker.repo
+fi
+REPO
+            elif distro_is ubuntu1604; then
+                cat <<\REPO > "${cw_ROOT}"/etc/distro/repos/docker.sh
+#!/bin/bash
+repo="deb https://apt.dockerproject.org/repo ubuntu-xenial main"
+if [ "$1" == "enable" ]; then
+  apt-get install -y apt-transport-https ca-certificates
+  apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 \
+    --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+  add-apt-repository -u -y "${repo}"
+  apt-get update
+else
+  apt-add-repository -r -y "${repo}"
+fi
+REPO
+            else
+                echo "Sorry, the Docker repository is not supported on your distro: ${cw_DIST}"
+                exit 1
+            fi
+            chmod 755 "${cw_ROOT}"/etc/distro/repos/docker.sh
+        fi
+        if distro_enable_repository docker; then
+            if distro_is el7; then
+                yum -e0 -y install docker-engine
+            else
+                apt-get install -y linux-image-extra-$(uname -r) linux-image-extra-virtual
+                apt-get install -y docker-engine
+            fi
+        else
+            echo "Sorry, the Docker repository is not available."
+            exit 1
+        fi
+    else
+        echo "Sorry, the Docker repository is prohibited."
+        exit 1
+    fi
+}
+
+setup
+require distro
+require files
+
+files_load_config --optional distro
+
+main "$@"

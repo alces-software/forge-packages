@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "launch-www-events",
+    "version": "2.0.0-dev",
+    "summary": "Configure an AWS cluster for web operations with Flight Launch",
+    "dependencies": [
+      "alces/www-events-aws"
+    ]
+  }
+}

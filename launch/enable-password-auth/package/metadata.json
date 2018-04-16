@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "enable-password-auth",
+    "version": "2.0.0-dev",
+    "summary": "Configures SSH to accept password authentication",
+    "dependencies": [
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+: '
+: SYNOPSIS: VPN configuration for secure access to this cluster
+: HELP: Display paths and URLs (where available) of the VPN configuration files.
+: '
+################################################################################
+##
+## Alces Clusterware - Metadata file
+## Copyright (c) 2016 Alces Software Ltd
+##
+################################################################################
+require files
+files_load_config cluster-vpn
+cw_META_vpn_configs_path_desc="VPN configuration path"
+cw_META_vpn_configs_path="${cw_ROOT}/etc/openvpn/client/clusterware"
+cw_META_vpn_config_tgz_desc="Tarred configuration"
+cw_META_vpn_config_tgz="${cw_ROOT}/etc/openvpn/client/clusterware-openvpn.tgz"
+cw_META_vpn_config_zip_desc="Zipped configuration"
+cw_META_vpn_config_zip="${cw_ROOT}/etc/openvpn/client/clusterware-openvpn.zip"
+cw_META_vpn_config_tblk_desc="Tunnelblick configuration"
+cw_META_vpn_config_tblk="${cw_ROOT}/etc/openvpn/client/clusterware-tunnelblick.zip"
+if files_load_config --optional clusterware-www; then
+   if [ "${cw_WWW_https_enabled:-true}" == "true" -a -n "${cw_CLUSTER_VPN_access_password}" ]; then
+       require network
+       files_load_config --optional access
+       host="${cw_ACCESS_fqdn:-$(network_get_public_hostname)}"
+       cw_META_vpn_www_access_desc="Download web page"
+       if [ "${cw_WWW_https_port:-443}" != "443" ]; then
+           port=":${cw_WWW_https_port}"
+       fi
+       cw_META_vpn_www_access="https://${host}${port}/vpn/"
+       unset host port
+       cw_META_vpn_www_access_user_desc="Download access username"
+       cw_META_vpn_www_access_user="vpn"
+       cw_META_vpn_www_access_password_desc="Download access password"
+       cw_META_vpn_www_access_password="${cw_CLUSTER_VPN_access_password}"
+   fi
+fi

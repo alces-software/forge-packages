@@ -1,0 +1,94 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+  local a xdg_config
+  IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+  for a in "${xdg_config[@]}"; do
+      if [ -e "${a}"/clusterware/config.rc ]; then
+          source "${a}"/clusterware/config.rc
+          break
+      fi
+  done
+  if [ -z "${cw_ROOT}" ]; then
+      echo "$0: unable to locate clusterware configuration"
+      exit 1
+  fi
+  kernel_load
+}
+
+main() {
+  eval "$(member_parse)"
+  log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+  scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+  if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+    autoscaling_group=$(member_find_tag "autoscaling_group" "${cw_MEMBER_tags}")
+    if [ "${autoscaling_group}" ]; then
+      log "Member ${cw_MEMBER_name} leaving autoscaling group ${autoscaling_group}"
+
+      rm "${cw_ROOT}/etc/config/autoscaling/groups/${autoscaling_group}/${cw_MEMBER_name}"
+
+      if [ ! "$(ls -A "${cw_ROOT}/etc/config/autoscaling/groups/${autoscaling_group}/")" ]; then
+        log "Group now empty, removing..."
+        # That was the last member of the group
+        # Find which group label corresponds to that group
+        for label in ${cw_ROOT}/etc/config/autoscaling/by-label/*; do
+          label_group=$(basename `readlink "$label"`)
+          if [[ "$label_group" == "$autoscaling_group" ]]; then
+            autoscaling_group_label="$(basename "$label")"
+
+            # We can't delete the label yet since it might still be used by the default link
+            label_filename="$label"
+            break
+          fi
+        done
+
+        if [[ "$autoscaling_group_label" != "" ]]; then  # If it _is_ empty something went wrong somewhere...
+          log "Triggering local 'autoscaling-prune-group' event with: ${autoscaling_group_label}"
+          "${cw_ROOT}"/libexec/share/trigger-event --local autoscaling-prune-group "${autoscaling_group_label}"
+
+          current_default=$(basename `readlink "${cw_ROOT}/etc/config/autoscaling/default"`)
+          if [[ "$current_default" == "$autoscaling_group_label" ]]; then
+            rm "${cw_ROOT}/etc/config/autoscaling/default"
+            # We need to find a new default group, if one exists! Pick the oldest group...
+            new_default=$(ls -t "${cw_ROOT}/etc/config/autoscaling/groups/" | grep -v "^$autoscaling_group\$" | tail -n 1)
+
+            # $new_default will be empty if we lost our last group, so no need to set a new default
+            if [[ "$new_default" != "" ]]; then
+              # Find the label for this new default group
+              for label in ${cw_ROOT}/etc/config/autoscaling/by-label/*; do
+                label_group=$(basename `readlink "$label"`)
+                if [[ "$label_group" == "$new_default" ]]; then
+                  # We have our new default, set the symlink
+                  ln -s "$label" "${cw_ROOT}/etc/config/autoscaling/default"
+                  break
+                fi
+              done
+            fi
+          fi
+        fi
+
+        log "Removing group label"
+        # Now it's safe to remove the label
+        rm "$label_filename"
+        log "Removing group"
+        # And finally remove the group from our config
+        rmdir "${cw_ROOT}/etc/config/autoscaling/groups/${autoscaling_group}"
+      fi
+    fi
+  fi
+}
+
+setup
+require handler
+require files
+require log
+require member
+
+log_set_default "/var/log/clusterware/autoscaler.log"
+
+handler_tee main "$@"

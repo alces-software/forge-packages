@@ -1,0 +1,63 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local intf scheduler_roles
+
+    if [ "$cw_CLUSTER_SGE_cleanup_on_leave" != "true" ]; then
+        return 0
+    fi
+
+    files_load_config instance config/cluster
+
+    eval "$(member_parse)"
+    log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        log "This instance is a scheduler master; checking left member for scheduler compute role"
+        scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+        if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+            log "Removing node: ${cw_MEMBER_name} (${cw_MEMBER_ip})"
+            handler_run_helper share/prune-node "${cw_MEMBER_name}" 2>&1 | \
+                log_blob "${cw_CLUSTER_SGE_log}" "prune-node"
+
+            intf="$(network_get_route_iface ${cw_MEMBER_ip})"
+
+            handler_iptables_delete INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 6444 -j ACCEPT | \
+                log_blob "${cw_CLUSTER_SGE_log}"
+        else
+            log "Left member does not have scheduler compute role; no further processing required"
+        fi
+    fi
+}
+
+setup
+require member
+require network
+require handler
+require log
+require files
+
+files_load_config --optional cluster-sge
+log_set_default "${cw_CLUSTER_SGE_log:-/var/log/clusterware/cluster-sge.log}"
+handler_tee main "$@"

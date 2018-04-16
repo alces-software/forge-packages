@@ -1,0 +1,74 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Clusterware.
+#
+# Alces Clusterware is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Alces Clusterware is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Alces Clusterware, please visit:
+# https://github.com/alces-software/clusterware
+#==============================================================================
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local username userhome clusterware_key_dir access_key
+    username="$1"
+    userhome=$(getent passwd "$username" | cut -d: -f6)
+    clusterware_key_dir="${userhome}"/.config/clusterware/ssh
+    access_key="${clusterware_key_dir}"/access_key.pub
+
+    if [[ ,"$(getent group ${_ADMIN_GROUP} | cut -f4 -d':')", == *",${username},"* ]]; then
+        if [ ! -f "${access_key}" ] && network_has_metadata_service; then
+            mkdir -p "${clusterware_key_dir}"
+            touch "${access_key}"
+            chmod 0600 "${access_key}"
+            network_fetch_ec2_metadata public-keys/0/openssh-key > "${access_key}"
+            chown -R ${username} "${userhome}"/.config
+        fi
+    fi
+
+    shopt -s nullglob
+    for a in "${clusterware_key_dir}"/*_key.pub; do
+        cat "$a"
+    done
+    shopt -u nullglob
+}
+
+setup
+
+require network
+require distro
+
+if distro_is el7 || distro_is el6; then
+    _ADMIN_GROUP=wheel
+else
+    _ADMIN_GROUP=sudo
+fi
+
+main "$@"

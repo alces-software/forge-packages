@@ -1,0 +1,54 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_signal_ready() {
+    files_load_config config config/cluster
+    if [ "${cw_CLUSTER_aws_signal_url}" ]; then
+        echo "Sending configuration complete notification to: ${cw_CLUSTER_aws_signal_url}"
+        args=(Status=SUCCESS)
+        args+=(Reason="Configuration complete")
+        args+=(UniqueId="$(uuid)")
+        files_load_config --optional signal
+        args+=(Data="${cw_SIGNAL_data:-Configuration complete at $(date +%Y-%m-%dT%H:%M:%S%z)}")
+        if ! curl -sS -X PUT -H 'Content-Type:' \
+             --data-binary "$(${_JO} "${args[@]}")" \
+             "${cw_CLUSTER_aws_signal_url}"; then
+           echo "ERROR: unable to send notification ($?)"
+        fi
+    fi
+}
+
+main() {
+    sed -i 's/^cw_STATUS=.*/cw_STATUS=ready/g' "${cw_ROOT}/etc/clusterware.rc"
+    "${cw_ROOT}"/libexec/share/nologin-control disable
+    _signal_ready
+}
+
+setup
+
+require handler
+require files
+
+_JO="${cw_ROOT}"/opt/jo/bin/jo
+
+handler_tee main "$@"

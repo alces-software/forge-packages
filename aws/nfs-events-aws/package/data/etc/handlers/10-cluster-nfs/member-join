@@ -1,0 +1,71 @@
+#!/bin/bash
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local a intf master_ip
+    . ${cw_ROOT}/etc/config/cluster/instance.vars.sh
+    if [ "${cw_INSTANCE_role}" == "master" ]; then
+        eval "$(member_parse)"
+        if [ "${cw_MEMBER_role}" == "slave" ]; then
+            cw_CLUSTER_NFS_exports="${cw_CLUSTER_NFS_exports:-/home}"
+	    for a in "${cw_ROOT}"/etc/cluster-nfs.d/*.rc; do
+		if [ -f "$a" ]; then
+		    . "$a"
+		fi
+	    done
+
+            intf="$(network_get_route_iface ${cw_MEMBER_ip})"
+            master_ip="$(network_get_network_address ${cw_MEMBER_ip})"
+
+            for a in $cw_CLUSTER_NFS_exports; do
+                test -f $a || mkdir -p $a
+                log "Exporting filesystem: ${cw_MEMBER_ip}/32:$a (rw,no_root_squash,no_subtree_check,sync)" \
+                    "${cw_CLUSTER_NFS_log}"
+                exportfs -o "rw,no_root_squash,no_subtree_check,sync" ${cw_MEMBER_ip}/32:$a
+            done
+
+            if ! iptables -C INPUT -i ${intf} -s ${cw_MEMBER_ip} -j ACCEPT &>/dev/null; then
+                log "Adding iptables rule: -I INPUT -i ${intf} -s ${cw_MEMBER_ip} -j ACCEPT" \
+                    "${cw_CLUSTER_NFS_log}"
+                iptables -I INPUT -i ${intf} -s ${cw_MEMBER_ip} -j ACCEPT
+            else
+                log "iptables rule already exists: -I INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 6444 -j ACCEPT" \
+                    "${cw_CLUSTER_NFS_log}"
+            fi
+
+            log "Broadcasting 'nfs-import' event with: ${master_ip} ${cw_MEMBER_ip} ${cw_CLUSTER_NFS_exports}" \
+                "${cw_CLUSTER_NFS_log}"
+            handler_broadcast nfs-import ${master_ip} ${cw_MEMBER_ip} ${cw_CLUSTER_NFS_exports}
+            # sleep for a short time to allow NFS import hooks to fire on
+            # slaves and establish locks.
+            sleep 1
+        fi
+    fi
+}
+
+setup
+require member
+require network
+require handler
+require log
+
+if [ -f "${cw_ROOT}/etc/cluster-nfs.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-nfs.rc"
+fi
+cw_CLUSTER_NFS_log="${cw_CLUSTER_NFS_log:-/var/log/clusterware/cluster-nfs.log}"
+
+handler_tee main "$@"

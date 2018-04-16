@@ -1,0 +1,42 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local nfsmnt
+    eval "$(member_parse)"
+    for nfsmnt in $(cat /proc/mounts | grep ^${cw_MEMBER_ip}: | cut -f1 -d" "); do
+        log "Unmounting filesystem: $nfsmnt" "${cw_CLUSTER_NFS_log}"
+        umount -l $nfsmnt
+    done
+}
+
+setup
+require member
+require handler
+require files
+require log
+
+files_load_config --optional cluster-nfs
+cw_CLUSTER_NFS_log="${cw_CLUSTER_NFS_log:-/var/log/clusterware/cluster-nfs.log}"
+
+handler_tee main "$@"

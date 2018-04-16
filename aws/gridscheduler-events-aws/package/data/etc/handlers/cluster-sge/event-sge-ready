@@ -1,0 +1,84 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015-2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local payload master_ip master_name target_ip instance_ip master_short_name
+
+    files_load_config instance config/cluster
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* || "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":submit:"* ]]; then
+        payload=($(cat))
+        log "Received payload from master: ${payload[*]}" "${cw_CLUSTER_SGE_log}"
+        master_ip="${payload[1]}"
+        master_name="${payload[2]}"
+        target_ip="${payload[3]}"
+        log "Parsed payload as: master: ${master_name} (${master_ip}) target: ${target_ip}" \
+            "${cw_CLUSTER_SGE_log}"
+
+        intf="$(network_get_route_iface ${master_ip})"
+        instance_ip="$(network_get_network_address ${master_ip})"
+        log "Instance IP is: ${instance_ip}" "${cw_CLUSTER_SGE_log}"
+
+        if [ "${instance_ip}" == "${target_ip}" ]; then
+            if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+                log "Applying compute configuration" "${cw_CLUSTER_SGE_log}"
+
+                handler_iptables_insert INPUT -i ${intf} -s ${master_ip} -p tcp --dport 6445 -j ACCEPT | \
+                    log_blob "${cw_CLUSTER_SGE_log}"
+
+                # A hammer required to support qrsh (could implement a
+                # more intelligent firewall wrapper, but this is
+                # sufficient for our current purposes.
+                handler_iptables_insert INPUT -i ${intf} -s ${master_ip} -j ACCEPT | \
+                    log_blob "${cw_CLUSTER_SGE_log}"
+            fi
+
+            log "Setting act_qmaster name to: ${master_name}" "${cw_CLUSTER_SGE_log}"
+            echo "${master_name}" > ${cw_ROOT}/opt/gridscheduler/etc/conf/act_qmaster # This line has always been here...
+            echo "${master_name}" > ${cw_ROOT}/opt/gridscheduler/etc/common/act_qmaster # This line is now needed to make things work.
+
+            if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+                log "Starting up clusterware-gridscheduler-execd service" "${cw_CLUSTER_SGE_log}"
+                if [ "${master_ip}" == "${target_ip}" ]; then
+                    # master and target are on same host; we delay for 10
+                    # seconds to ensure the qmaster has settled before we
+                    # join.
+                    sleep 10
+                fi
+                distro_start_service clusterware-gridscheduler-execd
+            fi
+        else
+            log "Configuration message not intended for this node." "${cw_CLUSTER_SGE_log}"
+        fi
+    fi
+}
+
+setup
+require network
+require distro
+require log
+require handler
+require files
+
+files_load_config --optional cluster-sge
+cw_CLUSTER_SGE_log="${cw_CLUSTER_SGE_log:-/var/log/clusterware/cluster-sge.log}"
+handler_tee main "$@"

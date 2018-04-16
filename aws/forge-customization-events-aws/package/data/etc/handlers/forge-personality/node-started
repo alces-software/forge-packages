@@ -1,0 +1,119 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+  local a xdg_config
+  IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+  for a in "${xdg_config[@]}"; do
+    if [ -e "${a}"/clusterware/config.vars.sh ]; then
+      source "${a}"/clusterware/config.vars.sh
+      break
+    fi
+  done
+  if [ -z "${cw_ROOT}" ]; then
+    echo "$0: unable to locate clusterware configuration"
+    exit 1
+  fi
+  kernel_load
+}
+
+_install_scheduler() {
+  local scheduler
+
+  scheduler=$(
+    ruby_run <<RUBY
+require 'yaml'
+p_file = '${cw_ROOT}/etc/personality.yml'
+begin
+  if File.exists?(p_file)
+    personality = YAML.load_file(p_file)
+    puts personality['scheduler']
+  end
+rescue
+end
+
+RUBY
+  )
+
+  if [ ! -z "$scheduler" ]; then
+    echo "Installing requested scheduler: ${scheduler}"
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+      echo "Installing ${scheduler}-master configuration"
+      "${_ALCES}" forge install "alces/${scheduler}-master"
+    fi
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+      echo "Installing ${scheduler}-compute configuration"
+      "${_ALCES}" forge install "alces/${scheduler}-compute"
+    fi
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":submit:"* ]]; then
+      echo "Installing ${scheduler}-submit configuration"
+      "${_ALCES}" forge install "alces/${scheduler}-submit"
+    fi
+
+    "${_ALCES}" forge install "alces/${scheduler}-events-aws"
+
+  else
+    echo "No scheduler specified in personality.yml."
+  fi
+}
+
+_install_packages() {
+  local package packages
+
+  packages=$(
+    ruby_run <<RUBY
+require 'yaml'
+p_file = '${cw_ROOT}/etc/personality.yml'
+begin
+  if File.exists?(p_file)
+    personality = YAML.load_file(p_file)
+    puts personality['packages'].join(' ')
+  end
+rescue
+end
+RUBY
+  )
+
+  for package in $packages; do
+    echo "Installing requested package ${package}"
+    "${_ALCES}" forge install "${package}"
+  done
+}
+
+main() {
+  if [ -d "${cw_ROOT}/etc/config/forge-personality" ]; then
+    # Personality already applied (this is a reboot)
+    exit 0
+  fi
+
+  if [ ! -f "${cw_ROOT}/etc/personality.yml" ]; then
+    echo "No ${cw_ROOT}/etc/personality.yml present, not configuring personality."
+    # But we'll try again on the next boot.
+    exit 0
+  fi
+
+  _install_scheduler
+  _install_packages
+
+  $(handler_dir)/share/software-installer.sh
+
+  mkdir -p "${cw_ROOT}/etc/config/forge-personality"
+}
+
+setup
+
+require files
+require handler
+require ruby
+
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

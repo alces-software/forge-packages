@@ -1,0 +1,47 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local admin_group
+    if distro_is "ubuntu1604"; then
+        admin_group=sudo
+    else
+        admin_group=wheel
+    fi
+    "${cw_ROOT}"/libexec/share/nologin-control enable
+    if network_has_metadata_service; then
+        handler_iptables_insert OUTPUT -d 169.254.169.254 \
+                                -m owner \
+                                ! --uid-owner root \
+                                ! --gid-owner ${admin_group} \
+                                -j DROP
+    fi
+}
+
+setup
+
+require handler
+require network
+require distro
+
+handler_tee main "$@"

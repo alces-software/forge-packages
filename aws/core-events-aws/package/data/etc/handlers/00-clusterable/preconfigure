@@ -1,0 +1,402 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_member_purge() {
+    type member_purge &>/dev/null && member_purge
+}
+
+_fetch_cluster_value() {
+    local key default_value
+    key="$1"
+    default_value="$2"
+    ruby_run <<RUBY
+require 'yaml'
+
+config = YAML.load_file('${cw_ROOT}/etc/config.yml')['cluster']
+puts config['${key}'] || '${default_value}'
+RUBY
+}
+
+_write_iam_role_credentials() {
+    local role_names role_doc key_id secret_key security_token expiry_time
+    role_names=($(network_fetch_ec2_metadata iam/security-credentials/))
+    role_doc="$(network_fetch_ec2_metadata iam/security-credentials/${role_names[0]})"
+    if [ "${role_doc}" ]; then
+        eval $(echo "${role_doc}" | \
+                      ${_JQ} -r \
+                             '"key_id=\(.AccessKeyId)"','"secret_key=\(.SecretAccessKey)"','"security_token=\(.Token)"','"expiry_time=\(.Expiration)"')
+        cat <<EOF > "${cw_ROOT}"/etc/config/cluster/instance-aws-iam.rc
+cw_INSTANCE_aws_iam_role_access_key_id="${key_id}"
+cw_INSTANCE_aws_iam_role_secret_access_key="${secret_key}"
+cw_INSTANCE_aws_iam_role_security_token="${security_token}"
+cw_INSTANCE_aws_iam_role_expiry_time="${expiry_time}"
+EOF
+    fi
+}
+
+_preconfigure_node() {
+    local autoscaling autoscaling_engine machine_type tags
+    if network_is_ec2; then
+        autoscaling=$(_fetch_cluster_value autoscaling autodetect)
+        autoscaling_engine=$(_fetch_cluster_value autoscaling_engine aws)
+        echo "[setup-aws] Autoscaling configured as: ${autoscaling}"
+        eval $(network_fetch_ec2_document | \
+                   ${_JQ} -r \
+                          '"region=\(.region)"','"ctime=\(.pendingTime)"','"instanceid=\(.instanceId)"')
+        machine_type="$(network_fetch_ec2_metadata instance-type 1)"
+        cat <<EOF > "${cw_ROOT}"/etc/config/cluster/instance-aws.rc
+cw_INSTANCE_aws_region="${region}"
+cw_INSTANCE_aws_ctime="${ctime}"
+cw_INSTANCE_aws_instanceid="${instanceid}"
+cw_INSTANCE_aws_autoscaling="${autoscaling}"
+cw_INSTANCE_aws_machinetype="${machine_type}"
+cw_INSTANCE_aws_account_hash="$(network_ec2_hashed_account)"
+EOF
+        # Set autoscaling type to AWS. If $cw_INSTANCE_aws_autoscaling is "disabled"
+        # (or is detected as such) then that is dealt with in autoscaling/configure
+        cat <<EOF >> "${cw_ROOT}"/etc/config/cluster/instance.rc
+
+cw_INSTANCE_autoscaling=${autoscaling_engine}
+EOF
+        cat <<EOF >> "${cw_ROOT}"/etc/config/cluster/instance.vars.sh
+
+cw_INSTANCE_autoscaling=${autoscaling_engine}
+EOF
+        _write_iam_role_credentials
+
+        cp "$(handler_dir)"/share/meta.aws.rc "${cw_ROOT}"/etc/meta.d/aws.rc
+        tags=(tags[aws_instanceid]=${instanceid})
+        tags+=(tags[aws_machinetype]=${machine_type})
+        echo "Setting EC2 tags: ${tags[@]}"
+        "${_JO}" "${tags[@]}" > "${cw_ROOT}"/etc/serf/tags-clusterable-ec2.json
+    else
+        tags=(tags[generic_systemid]=$(network_get_iface_mac $(network_get_first_iface)))
+        tags+=(tags[generic_machinetype]="$(dmidecode -s "system-product-name" | tail -n1 | tr ' ' '_')/$(dmidecode -s "processor-version" | tail -n1 | tr ' ' '_')")
+        echo "Setting generic tags: ${tags[@]}"
+        "${_JO}" "${tags[@]}" > "${cw_ROOT}"/etc/serf/tags-clusterable-generic.json
+    fi
+
+    if [ "${cw_CLUSTERABLE_manage_ssh_config}" == "true" ]; then
+        cat <<EOF >> /etc/ssh/sshd_config
+
+AuthorizedKeysCommand ${cw_ROOT}/libexec/share/clusterware-key-manager
+AuthorizedKeysCommandUser root
+HostbasedAuthentication yes
+IgnoreRhosts no
+EOF
+        distro_restart_service sshd
+    fi
+
+    if [[ "$cw_DIST" == "el"* ]]; then
+        echo "Prewarming yum cache in background; refer to /var/log/clusterware/clusterable-preconfigure-yum.log"
+        ( yum makecache 2>&1 | \
+              log_blob /var/log/clusterware/clusterable-preconfigure-yum.log ) \
+            </dev/null &>/dev/null & disown
+    fi
+}
+
+_preconfigure_master() {
+    local short_name
+    echo "Installing Clusterware periodic cronjob: ${cw_ROOT}/libexec/share/trigger-periodic"
+    echo "*/5 * * * * root ${cw_ROOT}/libexec/share/trigger-event periodic >/dev/null 2>&1" > /etc/cron.d/clusterware-clusterable-trigger-periodic
+
+    if [ "${cw_CLUSTERABLE_manage_genders}" == "true" ]; then
+        if [ -f "${cw_ROOT}"/etc/genders ]; then
+            short_name="$(hostname -s)"
+            if ! grep -q "^${short_name}" "${cw_ROOT}"/etc/genders; then
+                echo "${short_name} master,masters,cluster,all" >> "${cw_ROOT}"/etc/genders
+            fi
+        fi
+    fi
+
+    if [ "${cw_CLUSTERABLE_manage_ssh_config}" == "true" ]; then
+        mkdir -p /root/.ssh
+        chmod 0700 /root/.ssh
+        cat <<EOF > /root/.ssh/config
+Host *
+  HostbasedAuthentication yes
+EOF
+    fi
+}
+
+_parse_config() {
+    # Parse YAML file into something useful
+    ruby_run <<RUBY
+require 'yaml'
+require 'json'
+
+def write_file(name, content, *args)
+  File.write("${cw_ROOT}/etc/config/cluster/#{name}",content,*args)
+end
+
+def setup_cluster_identity(config)
+  if identity = config['identity']
+    config['uuid'] ||=
+      # try and extract anything that looks like a UUID from the identity
+      if identity =~ /([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/i
+        config['uuid'] = \$1
+      else
+        # otherwise assume the identity is unique and can serve as UUID input
+        config['uuid'] = \`uuid -v5 0103f694-c5a8-5779-af10-3668872f329d "#{identity}"\`.chomp
+      end
+
+    config['token'] ||=
+      # generate a token from the identity
+      \`uuid -v5 0103f694-c5a8-5779-af10-3668872f329d "#{identity}" | base64 | cut -c1-20\`.chomp
+  end
+end
+
+def deep_merge(target, source)
+  target.merge(source) do |key, old, new|
+    if Hash === old && Hash === new
+      deep_merge(old, new)
+    elsif Array === old && Array === new
+      old.concat(new).uniq
+    else
+      new
+    end
+  end
+end
+
+defaults =
+  begin
+    if File.exist?('${cw_ROOT}/etc/defaults.yml')
+      YAML.load_file('${cw_ROOT}/etc/defaults.yml')
+    end
+  rescue
+    {}
+  end
+
+config = deep_merge(defaults || {}, YAML.load_file('${cw_ROOT}/etc/config.yml'))
+File.write('${cw_ROOT}/etc/config.yml', config.to_yaml)
+
+config = config['cluster']
+
+setup_cluster_identity(config)
+
+if config['master']
+  h = { retry_join: [config['master']] }
+  write_file('serf/join.json', h.to_json)
+end
+
+uuid = config['uuid'] || \`uuid -v4\`.chomp
+
+h = { discover: uuid }
+write_file('serf/cluster.json', h.to_json)
+
+if config['interface']
+  h = { interface: config['interface'] }
+  write_file('serf/interface.json', h.to_json)
+end
+
+tags = config['tags'] || {}
+h = { tags: tags.merge({ role: config['role'] }) }
+write_file('serf/tags.json', h.to_json)
+
+if config['token']
+  h = { rpc_auth: config['token'] }
+  write_file('serf/auth.json', h.to_json, perm: 0600)
+end
+
+cluster_vars = []
+cluster_vars << %(cw_CLUSTER_uuid="#{uuid}")
+if config['master']
+  cluster_vars << %(cw_CLUSTER_master="#{config['master']}")
+end
+if config['name']
+  cluster_vars << %(cw_CLUSTER_name="#{config['name']}")
+end
+if config['interface']
+  cluster_vars << %(cw_CLUSTER_iface="#{config['interface']}")
+end
+cluster_vars << %(cw_CLUSTER_quorum="#{config['quorum'] || 1}")
+cluster_vars << %(cw_CLUSTER_service_url="#{config['service_url']}")
+
+# add rest of unknown vars in as cluster vars
+known_keys =
+  ['master','uuid','interface','tags','token',
+   'name','quorum','service_url','hyperthreading',
+   'scheduler','log','identity']
+config.each do |k,v|
+  unless known_keys.include?(k) || Hash === v
+    if Array === v
+      cluster_vars << %(cw_CLUSTER_#{k}=(#{v.map{|o|%("#{o}")}.join(" ")}))
+    else
+      cluster_vars << %(cw_CLUSTER_#{k}="#{v}")
+    end
+  end
+end
+write_file('cluster.vars.sh', cluster_vars.join("\n"))
+write_file('config.rc', cluster_vars.join("\n"))
+
+auth_vars = []
+if config['token']
+  auth_vars << %(cw_CLUSTER_auth_token="#{config['token']}")
+end
+write_file('auth.rc', auth_vars.join("\n"), perm: 0600)
+
+instance_vars = []
+instance_vars << %(cw_INSTANCE_role="#{config['role']}")
+instance_vars << %(cw_INSTANCE_log="#{config['log'] || '/var/log/clusterware/instance.log'}")
+tags.each do |k,v|
+  instance_vars << %(cw_INSTANCE_tag_#{k.upcase.tr('-','_')}="#{v}")
+end
+if config['hyperthreading']
+  instance_vars << %(cw_INSTANCE_hyperthreading="#{config['hyperthreading']}")
+end
+write_file('instance.vars.sh', instance_vars.join("\n"))
+write_file('instance.rc', instance_vars.join("\n"))
+
+scheduler_vars = (config['scheduler'] || {}).map do |k,v|
+  %(cw_SCHEDULER_#{k.to_s}="#{v}")
+end
+write_file('scheduler.rc', scheduler_vars.join("\n"))
+if config['role'] == 'master'
+  content = if File.exists?('${cw_ROOT}/etc/signal.rc')
+    File.read('${cw_ROOT}/etc/signal.rc').gsub!(%(cw_SIGNAL_data="),%(cw_SIGNAL_data="UUID=#{config['uuid']};Token=#{config['token']};))
+  else
+    %(cw_SIGNAL_data="UUID=#{config['uuid']};Token=#{config['token']}")
+  end
+  write_file('../../signal.rc', content, perm: 0600)
+end
+RUBY
+}
+
+_configure_hyperthreading() {
+    case "${cw_INSTANCE_hyperthreading}" in
+        enabled)
+            ${_ALCES} configure hyperthreading enable 2>&1
+            ;;
+        disabled)
+            ${_ALCES} configure hyperthreading disable 2>&1
+            ;;
+    esac
+}
+
+_allocate_hostname() {
+    local ipaddr iface_network prefix
+    ipaddr=$(network_get_iface_address "${cw_CLUSTER_iface:-$(network_get_first_iface)}")
+    iface_network=$(network_get_iface_network "${cw_CLUSTER_iface:-$(network_get_first_iface)}")
+    # if the subnet is >256 nodes, we need to work out what quad3 prefix we should use
+    if [ "$(echo "${iface_network}" | cut -f2 -d'/')" -lt 24 ]; then
+        prefix=$(ruby_run <<RUBY
+require 'ipaddr'
+network = IPAddr.new("${iface_network}")
+if network.instance_variable_get(:@mask_addr).to_s(2).count('1') < 20
+  # need two-character prefix
+  r = (IPAddr.new("${ipaddr}").to_i - network.to_i) / 256
+  puts "#{((r / 26) + 97).chr}#{((r % 26) + 97).chr}"
+else
+  first_net = network.to_s.split('.')[2].to_i
+  puts ("${ipaddr}".split('.')[2].to_i - first_net + 97).chr
+end
+RUBY
+              )
+    fi
+    printf "${cw_CLUSTER_hostname_prefix:-flight}-%s%03d" "${prefix}" "$(echo "${ipaddr}" | cut -f4 -d'.')"
+}
+
+_write_network_config() {
+    local domain hostname
+    if [ "${cw_CLUSTERABLE_manage_hostname:-true}" == "true" ]; then
+        hostname="${cw_CLUSTER_hostname:-$(_allocate_hostname)}"
+        domain="${cw_CLUSTER_domain:-prv.alces.network}"
+        "${cw_ROOT}"/libexec/share/update-etc-hosts --includes-fqdn \
+                    "${hostname}.${cw_CLUSTER_name}.${domain}" \
+                    "$(network_get_iface_address "${cw_CLUSTER_iface:-$(network_get_first_iface)}")"
+        hostnamectl set-hostname ${hostname}
+    fi
+    >"${cw_ROOT}"/etc/network.rc
+    if network_has_metadata_service 1; then
+        cat <<EOF >> "${cw_ROOT}"/etc/network.rc
+cw_NETWORK_public_hostname="$(network_get_public_hostname)"
+cw_NETWORK_public_ip="$(network_get_public_address)"
+EOF
+    else
+        hn="$(network_get_public_hostname 0)"
+        if [ "${hn}" ]; then
+            echo "cw_NETWORK_public_hostname=\"${hn}\"" >> "${cw_ROOT}"/etc/network.rc
+        fi
+        echo "cw_NETWORK_public_ip=\"$(network_get_public_address)\"" >> "${cw_ROOT}"/etc/network.rc
+    fi
+    domain="$(hostname -d)"
+    cat <<EOF >> "${cw_ROOT}"/etc/network.rc
+cw_NETWORK_domain="${domain:-prv.alces.network}"
+cw_NETWORK_fqdn="$(hostname -f)"
+cw_NETWORK_hostname="$(hostname -s)"
+cw_NETWORK_internal_ip="$(hostname -i)"
+EOF
+}
+
+_preconfigure_boot() {
+    files_load_config instance config/cluster
+    files_load_config config config/cluster
+    # Purge any known existing members in advance of rejoining the
+    # cluster service ring.
+    _member_purge
+    _configure_hyperthreading
+    _write_network_config
+}
+
+main() {
+    files_load_config --optional clusterable
+    cw_CLUSTERABLE_manage_ssh_config=${cw_CLUSTERABLE_manage_ssh_config:-true}
+    cw_CLUSTERABLE_manage_genders=${cw_CLUSTERABLE_manage_genders:-true}
+
+    # Bail out if we're already configured (this is a reboot)
+    if [ -d "${cw_ROOT}/etc/config/cluster" ]; then
+        _preconfigure_boot
+        exit 0
+    fi
+
+    # Bail out if we can't locate the config file
+    if [ ! -f "${cw_ROOT}/etc/config.yml" ]; then
+        exit 1
+    fi
+
+    mkdir -p "${cw_ROOT}/etc/config/cluster/serf"
+    _parse_config
+    cp -p "${cw_ROOT}/etc/config/cluster/serf"/*.json "${cw_ROOT}/etc/serf"
+
+    _preconfigure_boot
+    if [ "${cw_INSTANCE_role}" == "master" ]; then
+        _preconfigure_master
+    fi
+    _preconfigure_node
+}
+
+setup
+
+require ruby
+require distro
+require handler
+require member
+require files
+require network
+require log
+
+_JQ="${cw_ROOT}"/opt/jq/bin/jq
+_JO="${cw_ROOT}"/opt/jo/bin/jo
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

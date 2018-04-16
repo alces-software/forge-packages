@@ -1,0 +1,67 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local scheduler_roles intf port slots
+
+    files_load_config instance config/cluster
+
+    eval "$(member_parse)"
+    log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    log "Checking roles for new member (${cw_MEMBER_name})"
+    scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+    slots=$(member_find_tag "slots" "${cw_MEMBER_tags}")
+
+    handler_run_helper share/add-node "${cw_MEMBER_name}" "${scheduler_roles}" "${slots}" | log_blob
+
+    if [[ "${scheduler_roles}" == *":master:"* ]]; then
+        distro_start_service clusterware-openlava-lim
+        distro_start_service clusterware-openlava-sbatchd
+    fi
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+            log "Adding compute node"
+            "${cw_ROOT}"/opt/openlava/bin/lsaddhost -M ${slots:-1} "$(echo "${cw_MEMBER_name}" | cut -f1 -d'.')" | log_blob 2>&1
+        fi
+    fi
+
+    intf="$(network_get_route_iface ${cw_MEMBER_ip})"
+    for port in 16322 16323 16324 16325; do
+        handler_iptables_insert INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport $port -j ACCEPT
+    done
+    handler_iptables_insert INPUT -i ${intf} -s ${cw_MEMBER_ip} -p udp --dport 16322 -j ACCEPT
+}
+
+setup
+require member
+require handler
+require log
+require files
+require network
+require distro
+
+files_load_config --optional cluster-openlava
+log_set_default "${cw_CLUSTER_OPENLAVA_log:-/var/log/clusterware/cluster-openlava.log}"
+handler_tee main "$@"

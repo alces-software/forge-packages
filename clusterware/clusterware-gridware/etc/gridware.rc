@@ -1,0 +1,19 @@
+################################################################################
+##
+## Alces Clusterware - Shell configuration
+## Copyright (c) 2016-2018 Alces Software Ltd
+##
+################################################################################
+cw_GRIDWARE_root=/opt/gridware
+cw_GRIDWARE_default_depot=local
+cw_GRIDWARE_boot_update_package_repos=main
+cw_GRIDWARE_boot_update_depot_repos=official
+cw_GRIDWARE_prefer_binary=false
+cw_GRIDWARE_use_default_params=false
+cw_GRIDWARE_var=/var
+#cw_GRIDWARE_init_depots=site
+#cw_GRIDWARE_docker_registry=docker.io
+#cw_GRIDWARE_docker_registry_user=alces
+#cw_GRIDWARE_docker_gridware_repo=main
+#cw_GRIDWARE_admin_email=somebody@example.com
+cw_GRIDWARE_allow_users=true

@@ -1,0 +1,39 @@
+Flows:
+
+1. Master serves Gridware initialized in image (local disk) over NFS to slaves
+2. Master serves Gridware initialized on instance (persistent disk) over NFS to slaves
+3. Gridware is served from elsewhere (network disk) over NFS to master and slaves
+
+
+1. cluster-gridware handler with "immediate" configuration
+- when slave joins, can create/enable immediately
+
+2. cluster-gridware handler with "event" configuration
+- when slave joins, can create/enable only if gridware is ready
+
+3. no cluster-gridware handler
+
+
+Events:
+
+1. storage-ready
+2. depots-available
+3. nfs-ready
+
+storage-ready
+- disk ready for population
+- initialize gridware, inc. downloading depots
+- trigger depots-available
+- trigger nfs exports from master (trigger nfs mounts on slave)
+
+depot enabled
+- trigger `depot-enabled` event on slaves
+
+depot disabled
+- trigger `depot-disabled` event on slaves
+
+depot added
+- trigger `depot-added` event on slaves
+
+member join
+- if gridware is ready, trigger `depot-added` for all existing depots

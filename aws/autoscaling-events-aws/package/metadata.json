@@ -1,0 +1,14 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "autoscaling-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Clusterware autoscaling for AWS",
+    "username": "alces",
+    "dependencies": [
+      "alces/aws",
+      "alces/core-events-aws",
+      "alces/clusterware-events"
+    ]
+  }
+}

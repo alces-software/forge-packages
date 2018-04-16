@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "singularity",
+    "version": "2.4",
+    "summary": "Install the Singularity container platform",
+    "dependencies": [
+    ]
+  }
+}

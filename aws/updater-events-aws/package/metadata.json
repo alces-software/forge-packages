@@ -1,0 +1,12 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "updater-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Clusterware event to handle post-release updates on a cluster",
+    "dependencies": [
+      "alces/clusterware-events"
+    ],
+    "username": "alces"
+  }
+}

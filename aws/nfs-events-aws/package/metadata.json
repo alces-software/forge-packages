@@ -1,0 +1,13 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "nfs-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Cluster event handlers for NFS shares",
+    "username": "alces",
+    "dependencies": [
+      "alces/clusterware-events",
+      "alces/core-events-aws"
+    ]
+  }
+}

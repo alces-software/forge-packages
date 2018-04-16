@@ -1,0 +1,14 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "launch-common",
+    "version": "2.0.0-dev",
+    "summary": "Configure an AWS-based cluster for operation with Flight Launch",
+    "dependencies": [
+      "alces/launch-www-events",
+      "alces/launch-web-terminal",
+      "alces/enable-password-auth",
+      "alces/set-admin-password"
+    ]
+  }
+}

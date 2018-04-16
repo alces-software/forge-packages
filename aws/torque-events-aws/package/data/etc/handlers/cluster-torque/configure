@@ -1,0 +1,62 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_configure_torque() {
+    echo "Configuring TORQUE (refer to ${cw_CLUSTER_TORQUE_log})"
+
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+        log "Instance is TORQUE compute node, writing resource tags"
+        handler_add_libdir "${cw_ROOT}"/var/lib/scheduler
+        require torque
+        torque_write_node_resources "${cw_ROOT}/etc/serf/tags-node-resources.json"
+        distro_restart_service clusterware-serf.service
+    fi
+}
+
+main() {
+    local handler_config_dir="${cw_ROOT}/etc/config/cluster-torque"
+
+    # Bail out if we're already configured (this is a reboot).
+    if [ -d "${handler_config_dir}" ]; then
+        exit 0
+    fi
+
+    mkdir -p "${handler_config_dir}"
+
+    files_load_config cluster-torque
+    log_set_default "${cw_CLUSTER_TORQUE_log}"
+
+    _configure_torque
+}
+
+setup
+require distro
+require handler
+require files
+require log
+
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

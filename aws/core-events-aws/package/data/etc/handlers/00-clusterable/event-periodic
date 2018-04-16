@@ -1,0 +1,67 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_refresh_iam_role_credentials() {
+    local role_names role_doc key_id secret_key security_token expiry_time
+    role_names=($(network_fetch_ec2_metadata iam/security-credentials/))
+    role_doc="$(network_fetch_ec2_metadata iam/security-credentials/${role_names[0]})"
+    eval $(echo "${role_doc}" | \
+                  ${_JQ} -r \
+                         '"key_id=\(.AccessKeyId)"','"secret_key=\(.SecretAccessKey)"','"security_token=\(.Token)"','"expiry_time=\(.Expiration)"')
+    if [ "${cw_INSTANCE_aws_iam_role_access_key_id}" != "${key_id}" ]; then
+        cat <<EOF > "${cw_ROOT}"/etc/config/cluster/instance-aws-iam.rc
+cw_INSTANCE_aws_iam_role_access_key_id="${key_id}"
+cw_INSTANCE_aws_iam_role_secret_access_key="${secret_key}"
+cw_INSTANCE_aws_iam_role_security_token="${security_token}"
+cw_INSTANCE_aws_iam_role_expiry_time="${expiry_time}"
+EOF
+    fi
+    if [ -d "${cw_ROOT}"/var/lib/event-periodic/scripts ]; then
+        for a in "${cw_ROOT}"/var/lib/event-periodic/scripts/*; do
+            if [ -x "$a" ]; then
+                "$a" | log_blob /var/log/clusterware/clusterable-event-periodic.log
+            fi
+        done
+    fi
+}
+
+main() {
+    files_load_config --optional instance-aws config/cluster
+    if [ -x "${cw_ROOT}"/libexec/share/flight-recorder ]; then
+      "${cw_ROOT}"/libexec/share/flight-recorder ping
+    fi
+    if files_load_config --optional instance-aws-iam config/cluster; then
+       _refresh_iam_role_credentials
+    fi
+}
+
+setup
+
+require handler
+require files
+require network
+require log
+
+_JQ="${cw_ROOT}"/opt/jq/bin/jq
+
+handler_tee main "$@"

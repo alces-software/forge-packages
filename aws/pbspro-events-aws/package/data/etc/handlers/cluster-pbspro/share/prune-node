@@ -1,0 +1,34 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+name="$1"
+
+domainname="$(hostname -d)"
+if [[ "${name}" != *"."* ]]; then
+    # name is simply "<hostname>"
+    short_name="${name}"
+    name="${name}.${domainname}"
+else
+    if [[ "${name}" != *".${domainname}" ]]; then
+        # name is "<hostname>.<subdomain>"
+        name="$1.${domainname}"
+    fi
+    short_name=$(echo ${name} | cut -f1 -d'.')
+fi
+
+mkdir -p "${cw_ROOT}"/var/lock
+exec 9> "${cw_ROOT}"/var/lock/cluster-pbspro.lock && flock -w30 9
+# Remove entry from server_priv/nodes
+export PBS_CONF_FILE="${cw_ROOT}"/opt/pbspro/etc/pbs.conf
+if "${cw_ROOT}"/opt/pbspro/bin/qmgr -c "list nodes ${name}" 2>/dev/null; then
+    echo "Removing ${name} from cluster"
+    LD_LIBRARY_PATH="${cw_ROOT}"/opt/pbspro/lib:$LD_LIBRARY_PATH
+    "${cw_ROOT}"/opt/pbspro/bin/qmgr -c "delete node ${name}"
+else
+    echo "${name} is not registered to cluster"
+fi
+exec 9>&-

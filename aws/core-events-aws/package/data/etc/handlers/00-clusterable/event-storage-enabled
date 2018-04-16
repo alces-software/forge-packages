@@ -1,0 +1,46 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local storage_backends a payload
+    files_load_config instance config/cluster
+    if [[ "${cw_INSTANCE_role}" == "slave" ]]; then
+        payload=($(cat))
+        storage_backends=("${payload[@]:1}")
+        log "[storage-enabled] Received list of storage backends from master: ${storage_backends[*]}"
+        for a in "${storage_backends[@]}"; do
+            if [ ! -L "${cw_ROOT}"/etc/storage/${a} ]; then
+                ${_ALCES} storage enable ${a}
+            fi
+        done
+    fi
+}
+
+setup
+
+require handler
+require files
+
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

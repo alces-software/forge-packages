@@ -1,0 +1,22 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+
+. $(dirname ${BASH_SOURCE[-1]})/common
+
+if _lock; then
+  groupname="$1"
+
+  # Delete partition, and any dummy nodes created for that group
+  sed -i -e "/PartitionName=${groupname}/d" \
+         -e "/NodeName=autoscaling-slot-${groupname}/d" \
+      "${cw_CLUSTER_SLURM_config}"
+
+  _unlock
+else
+  echo "Locking failed; unable to delete partition"
+fi

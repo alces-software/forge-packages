@@ -1,0 +1,16 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "legacy-customization-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Account customization profile support for Forge-based clusters",
+    "username": "alces",
+    "dependencies": [
+      "alces/clusterware-events",
+      "alces/core-events-aws",
+      "alces/tcping",
+      "alces/aws",
+      "alces/s3cmd"
+    ]
+  }
+}

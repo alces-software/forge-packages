@@ -1,0 +1,55 @@
+#!/bin/bash
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local payload master_ip target_ip instance_ip
+
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+        payload=($(cat))
+        log "Received payload from master: ${payload[*]}" "${cw_CLUSTER_SGE_log}"
+        master_ip="${payload[1]}"
+        target_ip="${payload[2]}"
+        log "Parsed payload as: master: ${master_ip} target: ${target_ip}" \
+            "${cw_CLUSTER_SGE_log}"
+
+        instance_ip="$(network_get_network_address ${master_ip})"
+        log "Instance IP is: ${instance_ip}" "${cw_CLUSTER_SGE_log}"
+
+        if [ "${instance_ip}" == "${target_ip}" ]; then
+            if [ "${target_ip}" == "${master_ip}" ]; then
+                log "\"I'm sorry Dave, I'm afraid I can't do that.\" - refusing to halt master node" "${cw_CLUSTER_SGE_log}"
+            else
+                log "Halting system!" "${cw_CLUSTER_SGE_log}"
+                halt -f
+            fi
+        else
+            log "This message is not intended for this node." "${cw_CLUSTER_SGE_log}"
+        fi
+    fi
+}
+
+setup
+require log
+require handler
+require files
+require network
+
+files_load_config --optional cluster-sge
+cw_CLUSTER_SGE_log="${cw_CLUSTER_SGE_log:-/var/log/clusterware/cluster-sge.log}"
+handler_tee main "$@"

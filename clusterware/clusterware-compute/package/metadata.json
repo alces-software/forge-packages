@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "clusterware-compute",
+    "version": "2.0.0-dev",
+    "summary": "Clusterware extensions for management of compute queues",
+    "dependencies": [
+    ]
+  }
+}

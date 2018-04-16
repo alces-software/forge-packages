@@ -1,0 +1,15 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "clusterware-events",
+    "version": "2.0.0-dev",
+    "username": "alces",
+    "summary": "Clusterware event handler framework",
+    "tagNames": ["clusterware_core"],
+    "dependencies": [
+      "alces/serf",
+      "alces/pluginhook",
+      "alces/modules"
+    ]
+  }
+}

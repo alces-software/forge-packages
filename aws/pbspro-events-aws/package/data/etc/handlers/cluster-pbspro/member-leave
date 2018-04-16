@@ -1,0 +1,64 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local scheduler_roles intf
+
+    if [ "$cw_CLUSTER_TORQUE_cleanup_on_leave" != "true" ]; then
+        return 0
+    fi
+
+    files_load_config instance config/cluster
+
+    eval "$(member_parse)"
+    log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    log "Checking roles for left member (${cw_MEMBER_name})"
+    scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* && "${scheduler_roles}" == *":compute:"* ]]; then
+        log "${cw_MEMBER_name} was TORQUE compute node; removing"
+        handler_run_helper share/prune-node "${cw_MEMBER_name}"
+    fi
+
+    # Remove Torque iptables rules.
+    intf="$(network_get_route_iface ${cw_MEMBER_ip})"
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        handler_iptables_delete INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 15001 -j ACCEPT 2>&1 | log_blob
+    fi
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* && "${scheduler_roles}" == *":master:"* ]]; then
+        handler_iptables_delete INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 15002 -j ACCEPT 2>&1 | log_blob
+        handler_iptables_delete INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 15003 -j ACCEPT 2>&1 | log_blob
+    fi
+}
+
+setup
+require member
+require handler
+require files
+require log
+require network
+
+files_load_config --optional cluster-torque
+log_set_default "${cw_CLUSTER_TORQUE_log:-/var/log/clusterware/cluster-torque.log}"
+handler_tee main "$@"

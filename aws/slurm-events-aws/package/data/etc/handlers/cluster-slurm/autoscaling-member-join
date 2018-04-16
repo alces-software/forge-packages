@@ -1,0 +1,57 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+  local hostname ip groupname group_max_size cores_per_node ram_mib
+  echo "Received autoscaling-member-join with args ${*}"
+
+  if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+    hostname="$(echo "$1" | sed -e "s/.${cw_NETWORK_domain}$//")"
+    ip="$2"
+    groupname="$3"
+    group_max_size="$4"
+    cores_per_node="$5"
+    ram_mib="$6"
+
+    if [[ "$groupname" == "default" ]]; then
+      # 'default' is reserved by Slurm
+      groupname="_default"
+    fi
+
+    handler_run_helper share/add-node-to-partition "$hostname" "$groupname"
+
+  fi
+}
+
+    setup
+    require handler
+    require files
+
+    handler_add_libdir share
+    require slurm-handler
+
+    files_load_config instance config/cluster
+    files_load_config --optional cluster-slurm
+    files_load_config network
+    export cw_CLUSTER_SLURM_config="${cw_CLUSTER_SLURM_config:-"${cw_ROOT}"/opt/slurm/etc/slurm.conf}"
+    handler_tee main "$@"

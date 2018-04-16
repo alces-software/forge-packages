@@ -1,0 +1,64 @@
+#!/bin/bash
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_notify_depots() {
+    local depots depot_name depot_id
+
+    files_load_config gridware
+    depots=()
+    for a in ${cw_GRIDWARE_root:-/opt/gridware}/*; do
+        if [ -L "$a" ]; then
+            depot_name=$(basename $a)
+            depot_id=$(basename $(readlink $a))
+            if [[ "${cw_GRIDWARE_depots_disabled}" == *":${depot_name}:"* ]]; then
+                depot_state="disabled"
+            else
+                depot_state="enabled"
+            fi
+            depots+=(${depot_id}:${depot_name}:${depot_state})
+        fi
+    done
+    if [ "${depots}" ]; then
+        handler_broadcast gridware-depots ${depots[*]}
+    fi
+}
+
+_notify_docker_exports() {
+  local r
+  r=$(type -p docker)
+  if [ $? == 0 ] && [ -x "$r" ]; then
+    # only if docker is installed and executable
+    handler_broadcast gridware-docker-exports
+  fi
+}
+
+main() {
+    files_load_config instance config/cluster
+    if [ "${cw_INSTANCE_role}" == "master" ]; then
+	files_load_config gridware config/gridware
+	if [ "${cw_GRIDWARE_trigger:-immediate}" == 'immediate' ]; then
+	    _notify_depots
+	fi
+  _notify_docker_exports
+    fi
+}
+
+setup
+require handler
+require files
+
+handler_tee main "$@"

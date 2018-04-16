@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "launch-web-terminal",
+    "version": "2.0.0-dev",
+    "summary": "Install and configure the web terminal service for Flight Launch",
+    "dependencies": [
+      "alces/www"
+    ]
+  }
+}

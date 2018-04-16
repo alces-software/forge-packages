@@ -1,0 +1,215 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_handle_port() {
+    local scheme enabled port alt_port_base
+    scheme="$1"
+    enabled="$2"
+    port="$3"
+    alt_port_base="$4"
+    if [ "${enabled}" == "true" ]; then
+        if ss -tln | grep -q ":${port}\b"; then
+            port=$(network_get_free_port ${alt_port_base})
+            # update clusterware-www config
+            sed -i "s/^#?cw_WWW_${scheme}_port=.*/cw_WWW_${scheme}_port=${port}/g" \
+                "${cw_ROOT}"/etc/clusterware-www.rc
+        fi
+        handler_iptables_insert INPUT -p tcp --dport $port -j ACCEPT 1>&2
+    else
+        port=""
+    fi
+    echo "${port}"
+}
+
+_install_nginx_conf() {
+  local srcname target tgtname
+  srcname="$1"
+  target="$2"
+  tgtname="${3:-${srcname}}"
+  sed -e "s,_ROOT_,${cw_ROOT},g" \
+    $(handler_dir)/resources/${srcname}.conf.tpl \
+    > "${cw_ROOT}"/etc/clusterware-www/${target}.d/${tgtname}.conf
+}
+
+main() {
+  local http_port https_port host
+
+  # Bail out if we're already configured (this is a reboot)
+  if [ -d "${cw_ROOT}/etc/config/cluster-www" ]; then
+      exit 0
+  fi
+
+  mkdir -p "${cw_ROOT}/etc/config/cluster-www"
+
+  files_load_config instance config/cluster
+
+  if [[ "${cw_INSTANCE_role}" != "master" ]]; then
+      return 0
+  fi
+
+  mkdir -p "${cw_ROOT}"/var/lib/clusterware-www/default/config
+
+  files_load_config config config/cluster
+  if [ -z "${cw_WWW_ssl_strategy}" -a "${cw_CLUSTER_host_naming}" == "allocate" ]; then
+      sed -i -e 's/^#cw_WWW_ssl_strategy=.*/cw_WWW_ssl_strategy=allocate/g' \
+          "${cw_ROOT}"/etc/clusterware-www.rc
+  fi
+
+  # if there's already a server listening on the port(s) that
+  # clusterware-www is configured for, try a couple of different
+  # ports.
+  http_port=$(_handle_port http "${cw_WWW_http_enabled:-true}" \
+                           "${cw_WWW_http_port:-80}" 8080)
+  if [ "$http_port" != "80" ]; then
+      http_port=":${http_port}"
+  else
+    http_port=""
+  fi
+
+  https_port=$(_handle_port https "${cw_WWW_https_enabled:-true}" \
+                            "${cw_WWW_https_port:-443}" 8443)
+  if [ "$https_port" != "443" ]; then
+      https_port=":${https_port}"
+  else
+    https_port=""
+  fi
+
+  # reload cw_WWW_* variables
+  files_load_config clusterware-www
+
+  cat <<EOF > "${cw_ROOT}"/etc/cluster-firewall/static.d/clusterware-www.rc
+################################################################################
+##
+## Alces Clusterware - Firewall rules
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+EOF
+
+  firewall_rules=()
+
+  if [ "${cw_WWW_http_enabled:-true}" == "true" ]; then
+      _install_nginx_conf http http base-http
+      sed -i -e "s,_HTTP_PORT_,${cw_WWW_http_port:-80},g" \
+          "${cw_ROOT}"/etc/clusterware-www/http.d/base-http.conf
+
+      _install_nginx_conf document-root server-http
+      firewall_rules+=(http)
+      echo "cw_CLUSTER_FIREWALL_rule_http=\"INPUT -p tcp --dport ${cw_WWW_http_port:-80} -j ACCEPT\"" >> "${cw_ROOT}"/etc/cluster-firewall/static.d/clusterware-www.rc
+
+      files_load_config config config/cluster
+
+      if network_is_ec2; then
+          prv_net=$(network_get_ec2_vpc_cidr_block)
+      else
+        prv_net=$(network_get_iface_network "${cw_CLUSTER_iface:-$(network_get_first_iface)}")
+      fi
+
+      _install_nginx_conf geo http
+      sed -i -e "s,_PRV_NETWORK_,$prv_net,g" \
+          "${cw_ROOT}"/etc/clusterware-www/http.d/geo.conf
+  fi
+
+  if [ "${cw_WWW_https_enabled:-true}" == "true" ]; then
+      _install_nginx_conf https http base-https
+      sed -i -e "s,_HTTPS_PORT_,${cw_WWW_https_port:-443},g" \
+          "${cw_ROOT}"/etc/clusterware-www/http.d/base-https.conf
+
+      _install_nginx_conf ssl-config server-https
+      _install_nginx_conf document-root server-https
+      mkdir -p "${cw_ROOT}"/etc/ssl/clusterware-www
+
+      if [ "${cw_WWW_ssl_strategy:-selfsigned}" == "selfsigned" ]; then
+          files_load_config --optional config config/cluster
+          naming_issue_self_signed_cert ${cw_WWW_ssl_name:-${cw_CLUSTER_name:-flight}}.cloud.alces.network \
+                                        "Alces Flight WWW Server" \
+                                        "${cw_ROOT}"/etc/ssl/clusterware-www
+      elif [ "${cw_WWW_ssl_strategy}" == "allocate" ]; then
+          files_load_config --optional config config/cluster
+          if files_load_config --optional cluster-vpn; then
+              if [ -n "${cw_CLUSTER_VPN_naming_suffix}" -a -n "${cw_CLUSTER_VPN_naming_ip}" ]; then
+                  alt_names=("${cw_CLUSTER_VPN_naming_suffix}:${cw_CLUSTER_VPN_naming_ip}")
+              fi
+          fi
+          "${cw_ROOT}"/libexec/share/allocate-ssl-certificate ${cw_WWW_ssl_name:-${cw_CLUSTER_name:-flight}} "${alt_names[@]}"
+          mkdir -p "${cw_ROOT}"/etc/ssl/clusterware-www
+          cp -p "${cw_ROOT}"/etc/ssl/cluster/* "${cw_ROOT}"/etc/ssl/clusterware-www
+      fi
+
+      if [ "${cw_WWW_http_redirect_enabled:-true}" == "true" ]; then
+          if [ "${cw_WWW_ssl_strategy}" == "allocate" ]; then
+              files_load_config access
+              _install_nginx_conf redirect-http-to-named-https server-http redirect-http-to-https
+          else
+            _install_nginx_conf redirect-http-to-https server-http
+          fi
+          https_port=":${cw_WWW_https_port:-443}"
+          if [ "${https_port}" == ":443" ]; then
+              https_port=""
+          fi
+          sed -i -e "s,_HTTPS_PORT_,${https_port},g" \
+              -e "s,_SERVER_NAME_,${cw_ACCESS_fqdn},g" \
+              "${cw_ROOT}"/etc/clusterware-www/server-http.d/redirect-http-to-https.conf
+      fi
+      firewall_rules+=(https)
+      echo "cw_CLUSTER_FIREWALL_rule_https=\"INPUT -p tcp --dport ${cw_WWW_https_port:-443} -j ACCEPT\"" >> "${cw_ROOT}"/etc/cluster-firewall/static.d/clusterware-www.rc
+  fi
+
+  echo "cw_CLUSTER_FIREWALL_rules=\"${firewall_rules[@]}\"" >> "${cw_ROOT}"/etc/cluster-firewall/static.d/clusterware-www.rc
+
+  cp websocket-proxy.conf.tpl "${cw_ROOT}"/etc/clusterware-www/server-https.d/websocket-proxy.conf
+
+  # Add access info to www metadata file
+  cat <<EOF > "${cw_ROOT}"/etc/meta.d/www.rc
+: '
+: SYNOPSIS: Web access details
+: HELP: Display information about the web service configuration for this cluster.
+: '
+################################################################################
+##
+## Alces Clusterware - Metadata file
+## Copyright (c) 2016 Alces Software Ltd
+##
+################################################################################
+EOF
+
+  host="${cw_ACCESS_fqdn:-$(network_get_public_hostname)}"
+  if [ "${cw_WWW_https_enabled:-true}" == "true" ]; then
+      echo "cw_META_www_https_desc=\"HTTPS access point\"" >> "${cw_ROOT}"/etc/meta.d/www.rc
+      echo "cw_META_www_https=\"https://${host}${https_port}/\"" >> "${cw_ROOT}"/etc/meta.d/www.rc
+  fi
+  if [ "${cw_WWW_http_enabled:-true}" == "true" ]; then
+      echo "cw_META_www_http_desc=\"HTTP access point\"" >> "${cw_ROOT}"/etc/meta.d/www.rc
+      echo "cw_META_www_http=\"http://${host}${http_port}/\"" >> "${cw_ROOT}"/etc/meta.d/www.rc
+  fi
+}
+
+setup
+require handler
+require naming
+require network
+require files
+
+files_load_config clusterware-www
+
+handler_tee main "$@"

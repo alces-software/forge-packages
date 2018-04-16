@@ -1,0 +1,34 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+name="$1"
+tmpfile="$(mktemp /tmp/cluster-openlava.prune-node.XXXXXXXX)"
+
+name="$(echo "${name}" | cut -f1 -d.)"
+
+mkdir -p "${cw_ROOT}"/var/lock
+exec 9> "${cw_ROOT}"/var/lock/cluster-openlava.lock && flock -w30 9
+# Remove entry from lsf.cluster.openlava
+if grep -q "^${name} " "${cw_ROOT}"/opt/openlava/etc/lsf.cluster.openlava; then
+    echo "Removing ${name} from cluster"
+    grep -v "^${name} " "${cw_ROOT}"/opt/openlava/etc/lsf.cluster.openlava > ${tmpfile}
+    cat "${tmpfile}" > "${cw_ROOT}"/opt/openlava/etc/lsf.cluster.openlava
+else
+    echo "${name} is not registered to cluster"
+fi
+
+# Remove entry to lsb.hosts
+if grep -q "^${name} " "${cw_ROOT}"/opt/openlava/etc/lsb.hosts; then
+    echo "Removing host definition for ${name}"
+    grep -v "^${name} " "${cw_ROOT}"/opt/openlava/etc/lsb.hosts > ${tmpfile}
+    cat "${tmpfile}" > "${cw_ROOT}"/opt/openlava/etc/lsb.hosts
+else
+    echo "${name} does not have a host definition"
+fi
+exec 9>&-
+
+rm -f "${tmpfile}"

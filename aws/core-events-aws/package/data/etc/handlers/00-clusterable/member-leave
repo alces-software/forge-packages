@@ -1,0 +1,132 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015-2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_prune_ssh_shosts() {
+    local ip tmpfile
+    ip="$1"
+    if [ "${cw_CLUSTERABLE_manage_root_shosts}" == "true" ]; then
+        echo "Removing IP address from shosts: $ip"
+        tmpfile=$(mktemp /root/.shosts.clusterable.XXXXXX)
+        chmod 0600 "${tmpfile}"
+        grep -v "^${ip}$" /root/.shosts > "${tmpfile}"
+        mv "${tmpfile}" /root/.shosts
+    fi
+}
+
+_prune_ssh_known_hosts() {
+    local ip tmpfile
+    ip="$1"
+    if [ "${cw_CLUSTERABLE_manage_ssh_host_keys}" == "true" ]; then
+        echo "Removing SSH host keys for: $ip"
+        tmpfile=$(mktemp /etc/ssh/ssh_known_hosts.clusterable.XXXXXX)
+        chmod 0644 "${tmpfile}"
+        grep -v "^${ip}," /etc/ssh/ssh_known_hosts > "${tmpfile}"
+        mv "${tmpfile}" /etc/ssh/ssh_known_hosts
+    fi
+}
+
+_prune_genders() {
+    local tmpfile name
+    name="$(echo "${cw_MEMBER_name}" | cut -f1 -d".")"
+    if [ "${cw_CLUSTERABLE_manage_genders}" == "true" ]; then
+        tmpfile="$(mktemp /tmp/genders.clusterable.XXXXXXXX)"
+        if [ -f "${cw_ROOT}"/etc/genders ]; then
+            if grep -q "^${name} " "${cw_ROOT}"/etc/genders; then
+                if files_lock "clusterable"; then
+                    grep -v "^${name} " "${cw_ROOT}"/etc/genders > "${tmpfile}"
+                    cat "${tmpfile}" > "${cw_ROOT}"/etc/genders
+                    files_unlock
+                else
+                    echo "Locking failed; unable to prune ${name} from genders file"
+                fi
+            fi
+        fi
+        rm -f "${tmpfile}"
+    fi
+}
+
+_check_quoracy() {
+    local count
+    count="$(member_count)"
+    if [ "${count}" -lt "$(member_quorum)" ]; then
+        handler_run_hook cluster-inquorate "${count}"
+    fi
+}
+
+_record_leave() {
+  if [ -x "${cw_ROOT}"/libexec/share/flight-recorder ]; then
+    instance_id=$(member_find_tag aws_instanceid "${cw_MEMBER_tags}")
+    if [ "${instance_id}" ]; then
+        machine_type=$(member_find_tag aws_machinetype "${cw_MEMBER_tags}")
+        "${cw_ROOT}"/libexec/share/flight-recorder "leave" "${instance_id}" "${cw_MEMBER_role}" "${machine_type}"
+    else
+        instance_id=$(member_find_tag generic_systemid "${cw_MEMBER_tags}")
+        if [ "${instance_id}" ]; then
+            machine_type=$(member_find_tag generic_machinetype "${cw_MEMBER_tags}")
+            "${cw_ROOT}"/libexec/share/flight-recorder "leave" \
+                        "${instance_id}" "${cw_MEMBER_role}" "${machine_type}"
+        fi
+    fi
+  fi
+}
+
+_prune_hosts() {
+    if [ "${cw_CLUSTERABLE_manage_etc_hosts}" == "true" ]; then
+        "${cw_ROOT}"/libexec/share/prune-etc-hosts "${cw_MEMBER_name}" "${cw_MEMBER_ip}"
+    fi
+}
+
+main() {
+    local member_data
+    member_data="$(cat)"
+    "${cw_ROOT}"/libexec/share/trigger-event --local pre-member-leave <<< "${member_data}"
+    member_unregister <<< "${member_data}"
+    eval $(member_parse <<< "${member_data}")
+
+    _check_quoracy
+    _record_leave
+    if [ "${cw_CLUSTERABLE_cleanup_on_leave}" == "true" ]; then
+        _prune_hosts
+        if [ "${cw_MEMBER_role}" == "master" ]; then
+            _prune_ssh_shosts "${cw_MEMBER_ip}"
+        else
+            _prune_genders
+        fi
+        _prune_ssh_known_hosts "${cw_MEMBER_ip}"
+    fi
+}
+
+setup
+
+require member
+require handler
+require files
+
+files_load_config --optional clusterable
+cw_CLUSTERABLE_manage_etc_hosts=${cw_CLUSTERABLE_manage_etc_hosts:-true}
+cw_CLUSTERABLE_manage_genders=${cw_CLUSTERABLE_manage_genders:-true}
+cw_CLUSTERABLE_manage_ssh_host_keys=${cw_CLUSTERABLE_manage_ssh_host_keys:-true}
+cw_CLUSTERABLE_manage_root_shosts=${cw_CLUSTERABLE_manage_root_shosts:-true}
+cw_CLUSTERABLE_cleanup_on_leave=${cw_CLUSTERABLE_cleanup_on_leave:-true}
+
+handler_tee main "$@"

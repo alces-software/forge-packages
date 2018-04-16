@@ -1,0 +1,13 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "pbspro-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "PBS Pro scheduler - Clusterware events support for AWS",
+    "dependencies": [
+      "alces/core-events-aws",
+      "alces/clusterware-events",
+      "alces/pbspro-common"
+    ]
+  }
+}

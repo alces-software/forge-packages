@@ -1,0 +1,39 @@
+#!/bin/bash
+
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.vars.sh
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/cluster-sge.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}
+
+if [ -f "${cw_ROOT}/etc/cluster-sge.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-sge.rc"
+fi
+
+if _lock; then
+  hostname="$1"
+  groupname="$2"
+
+  # Act iff hostgroup already exists
+  if qconf -shgrp "@${groupname}" > /dev/null 2>&1; then
+    tmpfile="$(mktemp /tmp/sge-add-host-to-hostgroup.XXXXXXXX)"
+
+    qconf -shgrp "@${groupname}" | \
+        sed -e "s/^hostlist NONE/hostlist /g" \
+            -e "s/^hostlist \(.*\)/hostlist ${hostname} \1/g" > "${tmpfile}" && \
+        qconf -Mhgrp "${tmpfile}"
+
+    rm -f "$tmpfile"
+  fi
+else
+    echo "Locking failed; unable to add host to hostgroup"
+fi

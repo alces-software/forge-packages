@@ -1,0 +1,18 @@
+################################################################################
+##
+## Alces Clusterware - Systemd service unit file
+## Copyright (c) 2015 Alces Software Ltd
+##
+################################################################################
+# Clusterware Web Server (systemd service unit)
+[Unit]
+Description=Clusterware Web Server
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=_cw_ROOT_/opt/clusterware-www/bin/nginx
+PIDFile=/var/run/clusterware-www.pid
+
+[Install]
+WantedBy=multi-user.target

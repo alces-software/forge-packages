@@ -1,0 +1,45 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_restart_www_service() {
+    if distro_restart_service clusterware-www; then
+        echo "Restarted Clusterware web service"
+    else
+        echo "Unable to restart Clusterware web service"
+    fi
+}
+
+main() {
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_role}" == "master" ]]; then
+        _restart_www_service
+    fi
+}
+
+setup
+require handler
+require files
+require distro
+
+handler_tee main "$@"

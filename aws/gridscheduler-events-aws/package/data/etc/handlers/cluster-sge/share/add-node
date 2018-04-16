@@ -1,0 +1,124 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.vars.sh
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/cluster-sge.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}
+
+if [ -f "${cw_ROOT}/etc/cluster-sge.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-sge.rc"
+fi
+cw_CLUSTER_SGE_max_rt_seconds=${cw_CLUSTER_SGE_max_rt_seconds:-259200}
+cw_CLUSTER_SGE_min_vmem_gb=${cw_CLUSTER_SGE_min_vmem_gb:-4}
+cw_CLUSTER_SGE_reconfigure_on_join=${cw_CLUSTER_SGE_reconfigure_on_join:-true}
+cw_CLUSTER_SGE_hostgroup_strategy=${cw_CLUSTER_SGE_hostgroup_strategy:-full}
+
+name="$1"
+domainname="$(hostname -d)"
+if [[ "${name}" != *"."* ]]; then
+    # name is simply "<hostname>"
+    short_name="${name}"
+    name="${name}.${domainname}"
+else
+    if [[ "${name}" != *".${domainname}" ]]; then
+        # name is "<hostname>.<subdomain>"
+        name="$1.${domainname}"
+    fi
+    short_name=$(echo ${name} | cut -f1 -d'.')
+fi
+ip="$2"
+slots="${3:-1}"
+vmem="$4"
+
+if [ ${vmem:-0} -lt $cw_CLUSTER_SGE_min_vmem_gb ]; then
+    vmem=$cw_CLUSTER_SGE_min_vmem_gb
+fi
+
+tmpfile="$(mktemp /tmp/sge-add-node.XXXXXXXX)"
+
+cat << EOF > "${tmpfile}"
+hostname              $name
+load_scaling          NONE
+complex_values        slots=$slots,exclusive=true,h_vmem=${vmem}G,h_rt=${cw_CLUSTER_SGE_max_rt_seconds}
+user_lists            NONE
+xuser_lists           NONE
+projects              NONE
+xprojects             NONE
+usage_scaling         NONE
+report_variables      NONE
+EOF
+if ! qconf -Ae "${tmpfile}"; then
+    if [ "${cw_CLUSTER_SGE_reconfigure_on_join}" == "true" ]; then
+        qconf -Me "${tmpfile}"
+    fi
+elif [ "${cw_CLUSTER_SGE_submission}" == "all" ]; then
+    qconf -as "${name}"
+fi
+
+if [ "${cw_CLUSTER_SGE_hostgroup_strategy}" != "skip" ]; then
+    if _lock; then
+        set -o pipefail
+        case "${cw_CLUSTER_SGE_hostgroup_strategy}" in
+            full)
+                # Remove any existing record from all hostgroups (except Flight autoscaling groups)
+                for a in $(qconf -shgrpl); do
+                    if [[ ! -e "${cw_ROOT}/etc/config/autoscaling/by-label/${a#@}" ]] && qconf -shgrp ${a} | grep -q "${name}"; then
+                        qconf -shgrp ${a} | sed -e "s/^\(.*\) ${name}\(.*\)/\1\2/g" \
+                                                -e "s/hostlist\s*$/hostlist NONE/g" > "${tmpfile}" && \
+                            qconf -Mhgrp "${tmpfile}"
+                    fi
+                done
+
+                # Add to allhosts group
+                qconf -shgrp @allhosts | sed -e "s/^hostlist NONE/hostlist /g" \
+                                             -e "s/^hostlist \(.*\)/hostlist ${name} \1/g" > "${tmpfile}" && \
+                    qconf -Mhgrp "${tmpfile}"
+
+                if [ $slots -gt 1 ]; then
+                    # Add to slot-aware hostgroup
+                    qconf -shgrp @${slots}slot | sed -e "s/^hostlist NONE/hostlist /g" \
+                                                     -e "s/^hostlist \(.*\)/hostlist ${name} \1/g" > "${tmpfile}" && \
+                        qconf -Mhgrp "${tmpfile}"
+                fi
+
+                # Workaround to make qmaster pay attention to hostgroup slots
+                for q in $(qconf -sql | grep byslot.q); do
+                  qconf -sq "${q}" > "${tmpfile}" && \
+                      qconf -Mq "${tmpfile}"
+                done
+                ;;
+            allhosts)
+                if ! qconf -shgrp @allhosts | grep -q "${name}"; then
+                    # Add to allhosts group
+                    qconf -shgrp @allhosts | sed -e "s/^hostlist NONE/hostlist /g" \
+                                                 -e "s/^hostlist \(.*\)/hostlist ${name} \1/g" > "${tmpfile}" && \
+                        qconf -Mhgrp "${tmpfile}"
+                fi
+                ;;
+            *)
+                echo "Unrecognized hostgroup strategy: ${cw_CLUSTER_SGE_hostgroup_strategy}"
+                ;;
+        esac
+        _unlock
+        set +o pipefail
+    else
+        echo "Locking failed; unable to update hostgroups files for ${short_name}"
+    fi
+fi
+
+rm -f "${tmpfile}"

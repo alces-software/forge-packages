@@ -1,0 +1,82 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_configure_export() {
+    local path ip role
+    path="$1"
+    shift 2
+    role="$3"
+    if [ "$role" == "slave" ]; then
+	ip="$2"
+	log "Exporting filesystem: ${ip}/32:$path (rw,no_root_squash,no_subtree_check,sync)" \
+	    "${cw_CLUSTER_NFS_log}"
+	exportfs -o "rw,no_root_squash,no_subtree_check,sync" ${ip}/32:"$path"
+    fi
+}
+
+_notify_exports() {
+    local exports master_ip ip role
+    exports=()
+    while [ "$1" != "--" ]; do
+	exports+=($1)
+	shift
+    done
+    shift
+    role="$3"
+    if [ "$role" == "slave" ]; then
+	ip="$2"
+	master_ip=$(network_get_network_address ${ip})
+	log "Broadcasting 'nfs-import' event with: ${master_ip} ${ip} ${a}" \
+            "${cw_CLUSTER_NFS_log}"
+	handler_broadcast nfs-import ${master_ip} ${ip} "${a}"
+        # sleep for a short time to allow NFS import hooks to fire on
+        # slaves and establish locks.
+        sleep 1
+    fi
+}
+
+main() {
+    local a
+    files_load_config instance config/cluster
+    if [ "${cw_INSTANCE_role}" == "master" ]; then
+	for a in "$@"; do
+	    # iterate over each existing member and configure export
+	    member_each _configure_export "$a"
+	done
+	# trigger nfs-import event for applicable members
+	member_each _notify_exports "$@"
+    fi
+}
+
+setup
+
+require handler
+require files
+require member
+require log
+require network
+
+files_load_config --optional cluster-nfs
+cw_CLUSTER_NFS_log="${cw_CLUSTER_NFS_log:-/var/log/clusterware/cluster-nfs.log}"
+
+handler_tee main "$@"

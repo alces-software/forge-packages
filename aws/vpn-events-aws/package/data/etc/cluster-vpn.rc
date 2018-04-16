@@ -1,0 +1,23 @@
+################################################################################
+##
+## Alces Clusterware - Shell configuration
+## Copyright (c) 2016-2017 Alces Software Ltd
+##
+################################################################################
+cw_CLUSTER_VPN_intf=tun0
+cw_CLUSTER_VPN_port=1194
+cw_CLUSTER_VPN_network=10.41.41.0/24
+cw_CLUSTER_VPN_cluster_intf=eth0
+# set cw_CLUSTER_VPN_auth to 'cert' for certificate-based
+# authentication, or 'pam' for password authentication.
+cw_CLUSTER_VPN_auth=cert
+# Set cw_CLUSTER_VPN_setup_www to non-true to disable installation
+# and configuration of the clusterware-www service. Enabled by
+# default.
+#cw_CLUSTER_VPN_setup_www=true
+#
+# Enable the following naming values to add an additional entry to
+# DNS for the VPN access point for this cluster as well as adding
+# the name to the SSL certificate.
+#cw_CLUSTER_VPN_naming_suffix=vpn
+#cw_CLUSTER_VPN_naming_ip=10.41.41.1

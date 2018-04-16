@@ -1,0 +1,14 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "vpn-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Clusterware VPN handler for AWS clusters",
+    "username": "alces",
+    "dependencies": [
+      "alces/core-events-aws",
+      "alces/clusterware-events",
+      "alces/openvpn"
+    ]
+  }
+}

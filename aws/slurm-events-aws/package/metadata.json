@@ -1,0 +1,12 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "slurm-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Slurm scheduler - Clusterware events support for AWS",
+    "dependencies": [
+      "alces/clusterware-events",
+      "alces/slurm-common"
+    ]
+  }
+}

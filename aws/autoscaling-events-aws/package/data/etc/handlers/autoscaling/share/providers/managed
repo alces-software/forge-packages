@@ -1,0 +1,223 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+
+# This file contains autoscaling functions for managed autoscaling. Function names should all
+# begin with 'managed_' and provide the required interface:
+# - managed_configure
+# - managed_unexhausted_nodes
+# - managed_shoot_node
+# - managed_scale_out
+
+setup() {
+  local a xdg_config
+  IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+  for a in "${xdg_config[@]}"; do
+    if [ -e "${a}"/clusterware/config.vars.sh ]; then
+      source "${a}"/clusterware/config.vars.sh
+      break
+    fi
+  done
+  if [ -z "${cw_ROOT}" ]; then
+    echo "$0: unable to locate clusterware configuration"
+    exit 1
+  fi
+  kernel_load
+
+  _AWS="${cw_ROOT}"/opt/aws/bin/aws
+  _JO="${cw_ROOT}"/opt/jo/bin/jo
+  _ALCES="${cw_ROOT}"/bin/alces
+}
+
+managed_configure() {
+  local aws_tags tags tmpfile group label
+
+  files_load_config config config/cluster
+
+  echo "Instance is running on EC2; configuring for autoscaling"
+
+  # Ensure autoscaling serviceware is installed.
+  "${_ALCES}" forge install alces/clusterware-compute
+
+  # Set serf tags containing:
+  #  - instance creation time
+  #  - autoscaling group name (if available)
+  tags=(tags[aws_ctime]=${cw_INSTANCE_aws_ctime})
+
+  tmpfile="$(mktemp /tmp/autoscaling-managed-configure.XXXXXXXX)"
+
+  aws_tags=$("${_AWS}" --region "${cw_INSTANCE_aws_region}" \
+                    ec2 describe-tags \
+                    --filters Name=resource-id,Values=${cw_INSTANCE_aws_instanceid}
+                 )
+
+  ruby_run <<RUBY > "$tmpfile"
+require 'json'
+
+def getValue(blob, key)
+  tag = blob.find { |a| a["Key"] == key }
+  if tag
+    tag["Value"]
+  else
+    nil
+  end
+end
+
+aws_tags = JSON.parse('${aws_tags}')['Tags']
+
+puts "group=#{getValue(aws_tags, 'aws:autoscaling:groupName')}"
+puts "label=#{getValue(aws_tags, 'AutoscalingGroupLabel')}"
+
+RUBY
+
+  . "$tmpfile"
+
+  if [ "$group" ]; then
+      tags+=(tags[autoscaling_group]=${group})
+      tags+=(tags[autoscaling_group_label]=${label:-$cw_INSTANCE_aws_machinetype})
+      tags+=(tags[autoscaling_group_cores]=\"$(grep -c '^processor\s*: [0-9]*$' /proc/cpuinfo)\")
+      tags+=(tags[autoscaling_group_ram_mib]=\"$(($(grep 'MemTotal' /proc/meminfo | awk '{print $2};')/1024))\")
+  fi
+
+  rm -f "$tmpfile"
+
+  echo "Setting autoscaling tags: ${tags[@]}"
+  "${_JO}" "${tags[@]}" > "${cw_ROOT}"/etc/serf/tags-autoscaling.json
+}
+
+managed_unexhausted_nodes() {
+  # An AWS node is "exhausted" if we've used up more than 53 minutes of its
+  # billing hour.
+  local node nodelist ctime
+  nodelist="$*"
+  for node in ${nodelist}; do
+    ctime=$(member_get_member_tag "${node}" "aws_ctime")
+    if [ "${ctime}" ]; then
+      ruby_run <<RUBY
+      require 'time'
+      delta = Time.now - Time.parse('${ctime}')
+      print "${node} " if delta % 3600 <= 3180
+RUBY
+    else
+      # unable to find ctime, assume unexhausted
+      echo -n "${node} "
+    fi
+  done
+}
+
+managed_shoot_node() {
+  local node instanceid group group_label shoot_exit_code
+  node="$1"
+  group="$2"
+  instanceid=$(member_get_member_tag "${node}" "aws_instanceid")
+  if ! group_label=$(label_from_group "$group"); then
+      log "[autoscaler:managed-shoot] Unable to determine label for group ${group}"
+      return 1
+  else
+    # scale in the capacity
+    log "[autoscaler:managed-shoot] Shooting node ${instanceid} in queue ${group_label}"
+    # call out to managed to remove the node from the group
+    set -o pipefail
+    ${_ALCES} compute shoot "${group_label}" "${instanceid}" 2>&1 | _log_blob "managed-shoot"
+    shoot_exit_code=$?
+    set +o pipefail
+    return ${shoot_exit_code}
+  fi
+}
+
+managed_scale_out() {
+  local cores_per_node group_name group_entry group_label group_label_as_env_var tmpfile
+  local nodes_req_var nodes_req
+  local current current_max current_desired
+
+  tmpfile="$(mktemp /tmp/autoscaler.XXXXXXXX)"
+
+  if [ ! -d  ${cw_ROOT}/etc/config/autoscaling/by-label ] || [ ! "$(ls -A "${cw_ROOT}/etc/config/autoscaling/by-label")" ]; then
+    log "[autoscaler:managed-scale-out] No autoscaling groups to scale out."
+    return 0
+  fi
+
+  for group_entry in ${cw_ROOT}/etc/config/autoscaling/by-label/*; do
+    group_label=$(basename $group_entry)
+    group_label_as_env_var=$(echo $group_label | sed -e "s/[-\.]/_/g")
+    group_name=$(dereference_group_label "$group_label")
+    cores_per_node="$(_cores_for_group $group_name)"
+    nodes_req=0
+    for scheduler in "${_SCHEDULERS[@]}"; do
+      log "[autoscaler:managed-scale-out] Retrieving job state data for scheduler ${scheduler} in queues for $group_label"
+      ${scheduler}_parse_job_states "${tmpfile}" "${cores_per_node}"
+      # cat "${tmpfile}" | _log_blob "metrics" # This makes logs very noisy but is useful for development/debugging
+      . "${tmpfile}"
+
+      nodes_req_var="${scheduler}_queue_${group_label_as_env_var}_nodes_req"
+      nodes_req=$((${nodes_req:-0}+${!nodes_req_var:-0}))
+    done
+    log "[autoscaler:managed-scale-out] Autoscaling group $group_label ($group_name) has demand for $nodes_req nodes"
+
+    if [[ "$nodes_req" -gt 0 ]]; then
+        log "[autoscaler:managed-scale-out] Requesting capacity for ${nodes_req}"
+
+        # Satisfy demand with $nodes_req for $group_label
+        ${_ALCES} compute expand "${group_label}" "${nodes_req}" 2>&1 | _log_blob "managed-shoot"
+    fi
+  done
+
+  rm -f "$tmpfile"
+}
+
+_cores_for_group() {
+  local group_cores groups_cores g
+  group="$1"
+
+  log "Looking for cores for group: $group"
+  files_load_config --optional group config/autoscaling/groups/${group}
+  if [ -z "${group_cores}" ]; then
+    groups_cores=()
+    _gather_group_cores() {
+        local group
+        while [ "$1" != "--" ]; do shift; done
+        group=$(member_find_tag "autoscaling_group" "$5")
+        if [ "${group}" ]; then
+          groups_cores+=(${group}:$(member_find_tag "autoscaling_group_cores" "$5"))
+        fi
+    }
+    member_each _gather_group_cores
+    groups_cores=($(printf "%s\n" "${groups_cores[@]}" | sort -u | tr '\n' ' '))
+
+    log "[autoscaler:cores_for_group] Found cores for groups: ${groups_cores[*]}"
+
+    if [ ${#groups_cores[@]} -gt 1 -a -n "${group}" ]; then
+      log "[autoscaler:cores_for_group] Looking for group: ${group}"
+      for g in "${groups_cores[@]}"; do
+          if [[ $g == ${group}:* ]]; then
+            group_cores=$(echo "${g}" | cut -f2 -d":")
+            log "[autoscaler:cores_for_group] Found group '${group}' has cores: ${group_cores}"
+          fi
+      done
+    else
+        group_cores=$(echo "${groups_cores[0]}" | cut -f2 -d":")
+        log "[autoscaler:cores_for_group] Selecting first group '${groups_cores[0]}' with cores: ${group_cores}"
+    fi
+  else
+      log "[autoscaler:cores_for_group] Found group '${group}' set to cores: ${group_cores}"
+  fi
+
+  if [ "${group_cores}" ]; then
+    echo "${group_cores}"
+  else
+      return 1
+  fi
+}
+
+setup
+require files
+require member
+require ruby
+
+# If the instance-aws file doesn't exist, we're not on AWS so we should error
+# (hence the lack of --optional flag)
+files_load_config instance-aws config/cluster

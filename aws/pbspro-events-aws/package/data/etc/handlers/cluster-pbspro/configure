@@ -1,0 +1,97 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_create_server_config() {
+    local master_ip
+    cat <<EOF > "${cw_ROOT}"/opt/pbspro/etc/pbs.conf
+PBS_SERVER=$(hostname -f)
+PBS_EXEC=${cw_ROOT}/opt/pbspro
+PBS_HOME=/var/spool/pbs
+PBS_CORE_LIMIT=unlimited
+PBS_SCP=/bin/scp
+EOF
+    if distro_is ubuntu1604; then
+        echo 'PATH=/usr/lib/postgresql/9.5/bin:$PATH' >> "${cw_ROOT}"/opt/pbspro/etc/pbs.conf
+    fi
+    export PBS_CONF_FILE="${cw_ROOT}"/opt/pbspro/etc/pbs.conf
+    export PBS_START_SERVER=1
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+        export PBS_START_MOM=1
+    else
+        export PBS_START_MOM=0
+    fi
+    files_load_config config config/cluster
+    files_load_config --optional clusterable
+    if [ "${cw_CLUSTERABLE_manage_etc_hosts:-true}" == "true" ]; then
+        master_ip=$(network_get_iface_address "${cw_CLUSTER_iface:-$(network_get_first_iface)}")
+        "${cw_ROOT}"/libexec/share/update-etc-hosts "$(hostname -f)" "${master_ip}"
+    fi
+    "${cw_ROOT}"/opt/pbspro/libexec/pbs_habitat
+}
+
+_configure_pbspro() {
+    echo "Configuring PBSPro (refer to ${cw_CLUSTER_PBSPRO_log})"
+
+    files_load_config instance config/cluster
+
+    # Enable service components based on node's role(s).
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        log "Instance is PBSPro server node"
+        _create_server_config
+    fi
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* ]]; then
+        log "Instance is PBSPro compute node"
+        handler_add_libdir "${cw_ROOT}"/var/lib/scheduler
+        require pbspro
+        pbspro_write_node_resources "${cw_ROOT}/etc/serf/tags-node-resources.json"
+        distro_restart_service clusterware-serf.service
+    fi
+}
+
+main() {
+    local handler_config_dir="${cw_ROOT}/etc/config/cluster-pbspro"
+
+    # Bail out if we're already configured (this is a reboot).
+    if [ -d "${handler_config_dir}" ]; then
+        exit 0
+    fi
+
+    mkdir -p "${handler_config_dir}"
+
+    files_load_config cluster-pbspro
+    log_set_default "${cw_CLUSTER_PBSPRO_log}"
+
+    _configure_pbspro
+}
+
+setup
+require handler
+require files
+require log
+require network
+require distro
+
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

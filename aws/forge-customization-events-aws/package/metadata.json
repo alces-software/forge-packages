@@ -1,0 +1,13 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "forge-customization-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Apply Flight cluster configuration specified by AWS userdata",
+    "dependencies": [
+      "alces/core-events-aws",
+      "alces/clusterware-events"
+    ],
+    "username": "alces"
+  }
+}

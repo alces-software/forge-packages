@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Create .byslot.q and .byhost.q queues for a given queuename, drawing from a
+# given hostgroup.
+
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.vars.sh
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/cluster-sge.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}
+
+if [ -f "${cw_ROOT}/etc/cluster-sge.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-sge.rc"
+fi
+
+if _lock; then
+  queuename="$1"
+  hostgroup="$2"
+
+  if ! qconf -sq "${queuename}.byslot.q" > /dev/null 2>&1; then
+    echo "Creating new queues for $queuename"
+    tmpfile="$(mktemp /tmp/sge-add-queue.XXXXXXXX)"
+
+    # qconf likes to split long subordinate_list entries over multiple lines.
+    # The tr|sed|tr transformation condenses these down into a single line
+    # so that subsequent sed expressions match.
+
+    qconf -sq "byslot.q" | \
+      tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+      sed -e "s/qname.*/qname ${queuename}.byslot.q/" \
+          -e "s/hostlist.*/hostlist @${hostgroup}/" \
+          -e "s/subordinate_list.*/subordinate_list NONE/" \
+    > "$tmpfile"
+
+    qconf -Aq "$tmpfile"
+
+    qconf -sq "bynode.q" | \
+      tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+      sed -e "s/qname.*/qname ${queuename}.bynode.q/" \
+          -e "s/hostlist.*/hostlist @${hostgroup}/" \
+          -e "s/subordinate_list.*/subordinate_list NONE/" \
+    > "$tmpfile"
+
+    qconf -Aq "$tmpfile"
+
+    # Now that they exist, we can properly configure subordination of new queues
+    qconf -sq "${queuename}.byslot.q" |
+      tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+      sed -e "s/subordinate_list.*/subordinate_list ${queuename}.bynode.q=1,bynode.q=1,byslot.q/" \
+    > "$tmpfile"
+    qconf -Mq "$tmpfile"
+
+    qconf -sq "${queuename}.bynode.q" |
+      tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+      sed -e "s/subordinate_list.*/subordinate_list ${queuename}.byslot.q=1,byslot.q=1,bynode.q/" \
+    > "$tmpfile"
+    qconf -Mq "$tmpfile"
+
+    # Also configure subordination of main byslot.q and bynode.q wrt our new queues
+    qconf -sq "byslot.q" | \
+      tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+      sed -r -e "s/subordinate_list (.*)/subordinate_list \1,${queuename}.bynode.q=1,${queuename}.byslot.q/" \
+    > "$tmpfile" && qconf -Mq "$tmpfile"
+
+    qconf -sq "bynode.q" | \
+      tr '\n' '\f' | sed -e "s/\\\\\f[[:space:]]*//g" | tr '\f' '\n' | \
+      sed -r -e "s/subordinate_list (.*)/subordinate_list \1,${queuename}.bynode.q,${queuename}.byslot.q=1/" \
+    > "$tmpfile" && qconf -Mq "$tmpfile"
+
+    rm -f "${tmpfile}"
+  fi
+else
+    echo "Locking failed; unable to add queues"
+fi

@@ -1,0 +1,80 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015-2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local vmem_gb slots intf master_ip scheduler_roles
+    files_load_config instance config/cluster
+
+    eval "$(member_parse)"
+    log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        log "This instance is a scheduler master; checking new member for scheduler compute role"
+        scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+        slots=$(member_find_tag "slots" "${cw_MEMBER_tags}")
+        vmem_gb=$(member_find_tag "ram_gb" "${cw_MEMBER_tags}")
+
+        slots=${slots:-1}  # If no slots specified, default to 1
+
+        if [[ "${scheduler_roles}" == *":compute:"* || "${scheduler_roles}" == *":submit:"* ]]; then
+            # Wait for a short while to ensure that the addition of
+            # the name to /etc/hosts percolates through to SGEs name
+            # resolution routines.
+            sleep 2
+
+            if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+                log "Adding node: ${cw_MEMBER_name} (${cw_MEMBER_ip}) with slots=${slots} and vmem=${vmem_gb}G"
+                handler_run_helper share/add-node "${cw_MEMBER_name}" "${cw_MEMBER_ip}" \
+                                   "${slots}" "${vmem_gb}" 2>&1 \
+                    | log_blob "${cw_CLUSTER_SGE_log}" "add-node"
+            else
+                log "Adding node: ${cw_MEMBER_name} (${cw_MEMBER_ip}) as submit host" \
+                    "${cw_CLUSTER_SGE_log}"
+                handler_run_helper share/add-submit-host "${cw_MEMBER_name}" 2>&1 | \
+                    log_blob "${cw_CLUSTER_SGE_log}" "add-submit-host"
+            fi
+
+            intf="$(network_get_route_iface ${cw_MEMBER_ip})"
+            master_ip="$(network_get_network_address ${cw_MEMBER_ip})"
+
+            handler_iptables_insert INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport 6444 -j ACCEPT | \
+                log_blob "${cw_CLUSTER_SGE_log}"
+
+            log "Broadcasting 'sge-ready' event with: ${master_ip} $(hostname -f) ${cw_MEMBER_ip}"
+            handler_broadcast sge-ready ${master_ip} $(hostname -f) ${cw_MEMBER_ip}
+        else
+            log "New member does not have scheduler roles; no further processing required"
+        fi
+    fi
+}
+
+setup
+require member
+require network
+require handler
+require log
+require files
+
+files_load_config --optional cluster-sge
+log_set_default "${cw_CLUSTER_SGE_log:-/var/log/clusterware/cluster-sge.log}"
+handler_tee main "$@"

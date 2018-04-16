@@ -1,0 +1,41 @@
+#!/bin/bash
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local sessionid
+    local -A vnc
+
+    sessionid="$1"
+    if sessiondir=$(vnc_find_sessiondir "${sessionid}"); then
+        sessionid=$(basename "$sessiondir")
+        . "${sessiondir}"/metadata.vars.sh
+        iptables -I INPUT -p tcp --dport "${vnc[PORT]}" -j ACCEPT
+        iptables -I INPUT -p tcp --dport "${vnc[WEBSOCKET]}" -j ACCEPT
+    fi
+}
+
+if [ "$UID" != "0" ]; then
+  exec sudo "$0" "$@"
+elif [ "$SUDO_USER" ]; then
+  HOME=$(eval echo "~$SUDO_USER")
+fi
+
+setup
+require vnc
+require handler
+
+handler_tee main "$@"

@@ -1,0 +1,67 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local group groupname group_maxsize cores_per_node ram_mib
+    group="$1"
+    group_maxsize="$2"
+    cores_per_node="$3"
+    ram_mib="$4"
+
+    if [[ "$group" == "default" ]]; then
+      # 'default' is reserved by Slurm
+      groupname="_default"
+    else
+      groupname="$group"
+    fi
+
+    slurm_log "Performing deferred configuration for scaling group: ${group} (size: ${group_maxsize}, cores: ${cores_per_node}, ram: ${ram_mib}MiB)"
+
+    handler_run_helper share/add-partition-if-not-exist "$groupname" "$group_maxsize"
+
+    # We're autoscaling so we need to add some dummy nodes to
+    # represent the scaling group otherwise we're unable to scale-out.
+    for a in $(seq 1 ${group_maxsize}); do
+        slurm_log "Adding node: autoscaling-slot-${group}-$a ${cores_per_node} ${ram_mib} FUTURE"
+        handler_run_helper share/add-node autoscaling-slot-${group}-$a ${cores_per_node} ${ram_mib} FUTURE
+        handler_run_helper share/add-node-to-partition autoscaling-slot-${group}-$a ${groupname}
+    done
+
+    files_load_config --optional instance config/cluster
+    if [ "$cw_INSTANCE_role" == "master" ]; then
+	distro_restart_service clusterware-slurm-slurmctld
+	"${cw_ROOT}/opt/slurm/bin/scontrol" reconfigure
+    fi
+}
+
+setup
+require distro
+require handler
+require files
+
+handler_add_libdir share
+require slurm-handler
+
+files_load_config --optional cluster-slurm
+export cw_CLUSTER_SLURM_config="${cw_CLUSTER_SLURM_config:-"${cw_ROOT}"/opt/slurm/etc/slurm.conf}"
+handler_tee main "$@"

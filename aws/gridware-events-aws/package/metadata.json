@@ -1,0 +1,15 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "gridware-events-aws",
+    "version": "2.0.0-dev",
+    "summary": "Gridware event handlers for Clusterware on AWS",
+    "username": "alces",
+    "dependencies": [
+      "alces/core-events-aws",
+      "alces/clusterware-events",
+      "alces/clusterware-storage",
+      "alces/nfs-events-aws"
+    ]
+  }
+}

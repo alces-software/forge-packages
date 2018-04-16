@@ -1,0 +1,75 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local scheduler_roles
+    if [ "$cw_CLUSTER_SLURM_cleanup_on_leave" != "true" ]; then
+        return 0
+    fi
+
+    files_load_config instance config/cluster
+
+    eval "$(member_parse)"
+    slurm_log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    slurm_log "Checking roles for left member (${cw_MEMBER_name})"
+    scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+
+    # Update this node's slurm.conf with left node.
+    if [[ "${scheduler_roles}" == *":master:"* ]]; then
+        slurm_log "${cw_MEMBER_name} is Slurm control node"
+    fi
+    if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+        slurm_log "${cw_MEMBER_name} is Slurm compute node"
+        handler_run_helper share/prune-node "${cw_MEMBER_name}"
+    fi
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        # We are the master node; we need to restart our slurmctld and then
+        # tell all compute nodes to reread their config.
+        # Note: is it possible this could cause an issue if a compute node has
+        # not yet updated their config?
+        distro_restart_service clusterware-slurm-slurmctld
+        "${cw_ROOT}/opt/slurm/bin/scontrol" reconfigure
+    fi
+
+    # Remove Slurm iptables rules.
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        handler_iptables_delete $(slurm_control_node_iptables_rule ${cw_MEMBER_ip}) 2>&1 | slurm_log_blob
+    fi
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":compute:"* && "${scheduler_roles}" == *":master:"* ]]; then
+        handler_iptables_delete $(slurm_compute_node_iptables_rule ${cw_MEMBER_ip}) 2>&1 | slurm_log_blob
+    fi
+}
+
+setup
+require member
+require distro
+require handler
+
+handler_add_libdir share
+require slurm-handler
+
+files_load_config --optional cluster-slurm
+export cw_CLUSTER_SLURM_config
+handler_tee main "$@"

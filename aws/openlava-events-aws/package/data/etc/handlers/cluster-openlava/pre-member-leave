@@ -1,0 +1,64 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local scheduler_roles intf port
+
+    if [ "$cw_CLUSTER_OPENLAVA_cleanup_on_leave" != "true" ]; then
+        return 0
+    fi
+
+    files_load_config instance config/cluster
+
+    eval "$(member_parse)"
+    log "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}"
+
+    log "Checking roles for left member (${cw_MEMBER_name})"
+    scheduler_roles=$(member_find_tag "scheduler_roles" "${cw_MEMBER_tags}")
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        if [[ "${scheduler_roles}" == *":compute:"* ]]; then
+            log "Removing compute node"
+            "${cw_ROOT}"/opt/openlava/bin/lsrmhost "$(echo "${cw_MEMBER_name}" | cut -f1 -d.)" | log_blob 2>&1
+        fi
+    fi
+
+    handler_run_helper share/prune-node "${cw_MEMBER_name}" | log_blob
+
+    intf="$(network_get_route_iface ${cw_MEMBER_ip})"
+    for port in 16322 16323 16324 16325; do
+        handler_iptables_delete INPUT -i ${intf} -s ${cw_MEMBER_ip} -p tcp --dport $port -j ACCEPT
+    done
+    handler_iptables_delete INPUT -i ${intf} -s ${cw_MEMBER_ip} -p udp --dport 16322 -j ACCEPT
+}
+
+setup
+require member
+require handler
+require log
+require network
+require files
+
+files_load_config --optional cluster-openlava
+log_set_default "${cw_CLUSTER_OPENLAVA_log:-/var/log/clusterware/cluster-openlava.log}"
+handler_tee main "$@"

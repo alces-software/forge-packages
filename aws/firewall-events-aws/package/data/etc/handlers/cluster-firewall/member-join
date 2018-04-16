@@ -1,0 +1,55 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local a b rules rule_var rule_args
+    eval "$(member_parse)"
+    files_load_config instance config/cluster
+    for a in "${cw_ROOT}"/etc/cluster-firewall/members.d/*.rc; do
+	if [ -f "$a" ]; then
+            echo "Loading ruleset: $(basename ${a})"
+	    . "$a"
+	    rules="${cw_CLUSTER_FIREWALL_join_rules:-${cw_CLUSTER_FIREWALL_rules}}"
+	    for b in "${rules}"; do
+		echo "Inserting rule: ${b}"
+		rule_var="cw_CLUSTER_FIREWALL_rule_${b}"
+		rule_args=(${!rule_var})
+		handler_iptables_insert "${rule_args[@]}"
+	    done
+	    unset cw_CLUSTER_FIREWALL_join_rules cw_CLUSTER_FIREWALL_rules
+	fi
+    done
+}
+
+setup
+require member
+require network
+require handler
+require files
+
+files_load_config cluster-firewall
+if [ "${cw_CLUSTER_FIREWALL_disabled}" == "true" ]; then
+    exit 0
+fi
+
+handler_tee main "$@"

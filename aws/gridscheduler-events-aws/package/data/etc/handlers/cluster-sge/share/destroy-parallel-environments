@@ -1,0 +1,48 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+# Destroy parallel environments for an autoscaling group. The group's queues must
+# already have been destroyed e.g. with the `destroy-queues` helper.
+
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.vars.sh
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/cluster-sge.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}
+
+if [ -f "${cw_ROOT}/etc/cluster-sge.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-sge.rc"
+fi
+
+if _lock; then
+  groupname="$1"
+
+  if qconf -sp "${groupname}-mpinodes" > /dev/null 2>&1; then
+    echo "Destroying PEs for $groupname"
+
+    qconf -dp "${groupname}-mpinodes"
+    qconf -dp "${groupname}-mpinodes-verbose"
+
+    qconf -dp "${groupname}-mpislots"
+    qconf -dp "${groupname}-mpislots-verbose"
+
+    qconf -dp "${groupname}-smp"
+    qconf -dp "${groupname}-smp-verbose"
+
+  fi
+else
+    echo "Locking failed; unable to destroy PEs"
+fi

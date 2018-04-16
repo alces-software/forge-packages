@@ -1,0 +1,179 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2015-2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.vars.sh ]; then
+            source "${a}"/clusterware/config.vars.sh
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_write_configuration() {
+    files_load_config --optional instance-aws config/cluster
+    ruby_run <<RUBY
+require 'yaml'
+
+def write_file(name, content)
+  File.write("${cw_ROOT}/etc/config/gridware/#{name}",content)
+end
+
+config = YAML.load_file('${cw_ROOT}/etc/config.yml')['cluster']['gridware'] || {}
+
+gridware_vars = []
+if config['depots']
+  depot_names = []
+  disabled_depot_names = []
+  config['depots'].each do |d|
+    depot_names << d['name']
+    disabled_depot_names << d['name'] if d['disabled']
+  end
+  gridware_vars << ('cw_GRIDWARE_depots="' << depot_names.join(' ') << '"')
+  gridware_vars << ('cw_GRIDWARE_depots_disabled=":' << disabled_depot_names.join(':') << ':"')
+end
+gridware_vars << ('cw_GRIDWARE_trigger="' << (config['trigger'] || 'immediate') << '"')
+region = '${cw_INSTANCE_aws_region}'
+if region != ''
+  region_map = (YAML.load_file('${cw_ROOT}/etc/gridware/region_map.yml') rescue {})
+  region = region_map.nil? ? region : (region_map[region] || 'eu-west-1')
+  host = (region == 'us-east-1' ? 's3.amazonaws.com' : "s3-#{region}.amazonaws.com")
+  gridware_vars << ('cw_GRIDWARE_s3_host="' << host << '"')
+  gridware_vars << ('cw_GRIDWARE_s3_bucket="alces-gridware-' << region << '"')
+  gridware_vars << 'cw_GRIDWARE_s3_package_prefix="upstream"'
+  gridware_vars << 'cw_GRIDWARE_s3_binary_prefix="dist"'
+end
+write_file('gridware.rc', gridware_vars.join("\n"))
+RUBY
+}
+
+_initialize_gridware() {
+    local hook_dir
+    hook_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    "${hook_dir}"/share/initialize-gridware
+}
+
+_update_repos() {
+    local a gridware_tmp_config
+    if [ ! -f "${cw_GRIDWARE_root:-/opt/gridware}"/etc/gridware.yml ]; then
+        gridware_tmp_config="${cw_ROOT}"/etc/gridware.yml
+    fi
+
+    for a in ${cw_GRIDWARE_boot_update_package_repos}; do
+        if [ "$gridware_tmp_config" ]; then
+            cat <<EOF > "${gridware_tmp_config}"
+:last_update_filename: .last_update
+:log_root: ${cw_GRIDWARE_var:-/var}/log/gridware
+:repo_paths:
+ - ${cw_ROOT}/var/lib/gridware/repos/${a}
+EOF
+        fi
+        echo "Updating package repo at boot: ${a}"
+        "${_ALCES}" gridware update "$a"
+    done
+
+    for a in ${cw_GRIDWARE_boot_update_depot_repos}; do
+        if [ "$gridware_tmp_config" ]; then
+            cat <<EOF > "${gridware_tmp_config}"
+:last_update_filename: .last_update
+:log_root: ${cw_GRIDWARE_var:-/var}/log/gridware
+:depot_repo_paths:
+ - ${cw_ROOT}/var/lib/gridware/depots/${a}
+EOF
+        fi
+        echo "Updating depot repo at boot: ${a}"
+        "${_ALCES}" gridware depot update "$a"
+    done
+
+    if [ "$gridware_tmp_config" ]; then
+        rm -f "${gridware_tmp_config}"
+    fi
+}
+
+_create_docker_ssl_cert() {
+  # 'just in case' a Docker repository is started on this node we should have
+  # a self-signed certificate ready to go, so that compute nodes can have installed
+  # it beforehand, and have their Docker daemons Just Work with it.
+
+  require naming
+  files_load_config config config/cluster
+
+  mkdir -p "${cw_GRIDWARE_root}/docker/certificates/private"
+  mkdir -p "${cw_GRIDWARE_root}/docker/certificates/public/${cw_CLUSTER_hostname}:5000"
+
+  naming_issue_self_signed_cert "$cw_CLUSTER_hostname" \
+    "Alces Flight Gridware Docker repository" \
+    "${cw_GRIDWARE_root}/docker/certificates/private"
+
+  cp "${cw_GRIDWARE_root}/docker/certificates/private/cert.pem" \
+     "${cw_GRIDWARE_root}/docker/certificates/public/${cw_CLUSTER_hostname}:5000/ca.crt"
+}
+
+_install_docker_ssl_cert() {
+  mkdir -p /etc/docker/
+  ln -s "${cw_GRIDWARE_root}/docker/certificates/public" /etc/docker/certs.d
+}
+
+main() {
+    local admin_uid
+
+    files_load_config gridware
+
+    _update_repos
+
+    # Bail out if we're already configured (this is a reboot)
+    if [ -d "${cw_ROOT}/etc/config/gridware" ]; then
+        exit 0
+    fi
+
+    mkdir -p "${cw_ROOT}/etc/config/gridware"
+
+    files_load_config instance config/cluster
+    if [ "${cw_INSTANCE_role}" == "master" ]; then
+        _write_configuration
+        files_load_config gridware config/gridware
+        if [ "${cw_GRIDWARE_trigger:-immediate}" == 'immediate' ]; then
+            _initialize_gridware
+        fi
+        files_load_config gridware config/gridware
+        if "${_ALCES}" storage enable http; then
+            echo -e "Gridware Data\nhttps://${cw_GRIDWARE_s3_host}/${cw_GRIDWARE_s3_bucket}/data\n" | \
+                "${_ALCES}" storage configure --system gridware-data http
+        fi
+
+        _create_docker_ssl_cert
+    else
+        _install_docker_ssl_cert
+    fi
+
+    # add admin user to gridware group
+    admin_uid=$(grep "^UID_MIN " /etc/login.defs | awk '{ print $2 };')
+    usermod -G gridware -a "$(id -gn ${admin_uid:-1000})"
+    if [ "${cw_INSTANCE_role}" == "master" ] && [ -d ${cw_GRIDWARE_root} ] && [ ! -f ${cw_GRIDWARE_root}/etc/whitelist.yml ]; then
+      # and add them to Gridware's userspace whitelist, if no whitelist currently exists
+      cat <<EOF >${cw_GRIDWARE_root}/etc/whitelist.yml
+:users:
+- $(id -un ${admin_uid:-1000})
+EOF
+fi
+}
+
+setup
+require handler
+require files
+require ruby
+
+_ALCES="${cw_ROOT}"/bin/alces
+
+handler_tee main "$@"

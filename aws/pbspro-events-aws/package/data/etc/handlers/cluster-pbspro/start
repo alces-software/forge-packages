@@ -1,0 +1,58 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+main() {
+    local c
+
+    files_load_config cluster-pbspro
+    log_set_default "${cw_CLUSTER_PBSPRO_log}"
+
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_tag_SCHEDULER_ROLES}" == *":master:"* ]]; then
+        echo "Starting master node PBSPro services (refer to ${cw_CLUSTER_PBSPRO_log})"
+        files_lock cluster-pbspro
+        log "Starting PBSPro scheduler"
+        distro_start_service clusterware-pbspro-sched
+        log "Starting PBSPro server"
+        distro_start_service clusterware-pbspro-server
+        c=0
+        while ! qmgr -c 'list server' &>/dev/null; do
+            sleep 1
+            c=$(($c+1))
+            if [ "$c" -gt 10 ]; then
+                echo "PBSPro server not available after 10s; giving up"
+                break
+            fi
+        done
+        files_unlock
+    fi
+}
+
+setup
+require handler
+require log
+require distro
+require files
+
+handler_tee main "$@"

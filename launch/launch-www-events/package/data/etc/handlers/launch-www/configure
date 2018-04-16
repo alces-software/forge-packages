@@ -1,0 +1,126 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler hook
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    local a xdg_config
+    IFS=: read -a xdg_config <<< "${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+    for a in "${xdg_config[@]}"; do
+        if [ -e "${a}"/clusterware/config.rc ]; then
+            source "${a}"/clusterware/config.rc
+            break
+        fi
+    done
+    if [ -z "${cw_ROOT}" ]; then
+        echo "$0: unable to locate clusterware configuration"
+        exit 1
+    fi
+    kernel_load
+}
+
+_install_nginx_conf() {
+  local srcname target tgtname
+  srcname="$1"
+  target="$2"
+  tgtname="${3:-${srcname}}"
+  sed -e "s,_ROOT_,${cw_ROOT},g" \
+    "$(handler_dir)"/resources/${srcname}.conf.tpl \
+    > "${cw_ROOT}"/etc/clusterware-www/${target}.d/${tgtname}.conf
+}
+
+_update_dynamic_values() {
+    local host ipAddress tmpfile redirectUrl
+    files_load_config --optional access
+    files_load_config --optional launch-www
+    host="${cw_ACCESS_fqdn:-$(network_get_public_hostname)}"
+    ipAddress="$(network_get_public_address)"
+
+    tmpfile="$(mktemp /tmp/cluster-www.XXXXXXXX)"
+
+    # dynamic values (per-boot)
+    $_JQ --arg host $host --arg ipAddress $ipAddress \
+        '.data.attributes.hostname = $host | .data.attributes.ipAddress = $ipAddress' \
+	"${cw_ROOT}"/var/lib/clusterware-www/launch/www/index.json \
+	> ${tmpfile}
+    chmod a+r "${tmpfile}"
+    mv ${tmpfile} "${cw_ROOT}"/var/lib/clusterware-www/launch/www/index.json
+
+    _install_nginx_conf cluster-www server-http
+    _install_nginx_conf cluster-www server-https
+    _install_nginx_conf redirect-https-to-launch-service server-https
+
+
+    # XXX This method of determining the URL to redirect to is duplicated in
+    # cluster-vpn/configure.  Figure out a way to remove the duplication.
+    # Perhaps a script similar to `www-add-attributes` is the way to go.
+    redirectUrl=$(
+        echo "${cw_LAUNCH_WWW_redirect_url_template:-https://launch.alces-flight.com/cluster/_HOSTNAME_}" \
+        | sed -e "s,_HOSTNAME_,${host},g"
+    )
+    sed -i -e "s,_REDIRECT_URL_,${redirectUrl},g" \
+        "${cw_ROOT}"/etc/clusterware-www/server-https.d/redirect-https-to-launch-service.conf
+}
+
+main() {
+    local edition
+
+    # Bail out if we're already configured (this is a reboot)
+    if [ -d "${cw_ROOT}/etc/config/launch-www" ]; then
+        _update_dynamic_values
+        exit 0
+    fi
+
+    mkdir -p "${cw_ROOT}/etc/config/launch-www"
+
+    mkdir -p "${cw_ROOT}"/var/lib/clusterware-www/launch/www
+    cp "$(handler_dir)"/libexec/www-add-attributes "${cw_ROOT}"/libexec/share/www-add-attributes
+
+    files_load_config instance config/cluster
+
+    if [[ "${cw_INSTANCE_role}" != "master" ]]; then
+        return 0
+    fi
+
+    # override the default document root to point to launch website
+    if [ -f "${cw_ROOT}"/etc/clusterware-www/server-http.d/document-root.conf ]; then
+        echo "root $cw_ROOT/var/lib/clusterware-www/launch;" > \
+             "${cw_ROOT}"/etc/clusterware-www/server-http.d/document-root.conf
+    fi
+    if [ -f "${cw_ROOT}"/etc/clusterware-www/server-https.d/document-root.conf ]; then
+        echo "root $cw_ROOT/var/lib/clusterware-www/launch;" > \
+             "${cw_ROOT}"/etc/clusterware-www/server-https.d/document-root.conf
+    fi
+
+    # Create the response document with configuration values.
+    local host
+    files_load_config config config/cluster
+    files_load_config clusterware
+    files_load_config --optional flight
+
+    $_JO -p data=$( $_JO \
+        id=${cw_CLUSTER_uuid} \
+        type="clusters" \
+        attributes=$( $_JO \
+            clusterName="${cw_CLUSTER_name}" \
+            edition="$(network_get_edition)" \
+            flightRelease="${cw_FLIGHT_release:-${cw_VERSION}}"
+        )
+    ) > "${cw_ROOT}"/var/lib/clusterware-www/launch/www/index.json
+
+    _update_dynamic_values
+}
+
+setup
+require handler
+require files
+require network
+require distro
+
+_ALCES="${cw_ROOT}"/bin/alces
+_JO="${cw_ROOT}"/opt/jo/bin/jo
+_JQ="${cw_ROOT}"/opt/jq/bin/jq
+
+handler_tee main "$@"

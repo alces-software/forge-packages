@@ -1,0 +1,79 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Clusterware - Handler support script
+## Copyright (C) 2017 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+# Create parallel environments for an autoscaling group. The group's queues must
+# already have been created e.g. with the `add-queues` helper.
+
+. /etc/profile.d/alces-clusterware.sh
+. /etc/xdg/clusterware/config.vars.sh
+module purge
+module use "${cw_ROOT}"/etc/modules
+module load services/gridscheduler
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/cluster-sge.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}
+
+if [ -f "${cw_ROOT}/etc/cluster-sge.rc" ]; then
+    . "${cw_ROOT}/etc/cluster-sge.rc"
+fi
+
+if _lock; then
+  groupname="$1"
+
+  if ! qconf -sp "${groupname}-mpinodes" > /dev/null 2>&1; then
+    echo "Creating new PEs for $groupname"
+    tmpfile="$(mktemp /tmp/sge-create-pe.XXXXXXXX)"
+
+    # PEs backed by <group>.bynode.q
+
+    qconf -sp "mpinodes" | \
+      sed -e "s/pe_name.*/pe_name ${groupname}-mpinodes/" > "${tmpfile}"
+    qconf -Ap "${tmpfile}"
+
+    qconf -sp "mpinodes-verbose" | \
+      sed -e "s/pe_name.*/pe_name ${groupname}-mpinodes-verbose/" > "${tmpfile}"
+    qconf -Ap "${tmpfile}"
+
+    # Add to queue's pe_list
+    qconf -sq "${groupname}.bynode.q" | \
+      sed -e "s/pe_list.*/pe_list ${groupname}-mpinodes ${groupname}-mpinodes-verbose/" > "${tmpfile}"
+    qconf -Mq "${tmpfile}"
+
+    # PEs backed by <group>.byslot.q
+
+    qconf -sp "mpislots" | \
+      sed -e "s/pe_name.*/pe_name ${groupname}-mpislots/" > "${tmpfile}"
+    qconf -Ap "${tmpfile}"
+
+    qconf -sp "mpislots-verbose" | \
+      sed -e "s/pe_name.*/pe_name ${groupname}-mpislots-verbose/" > "${tmpfile}"
+    qconf -Ap "${tmpfile}"
+
+    qconf -sp "smp" | \
+      sed -e "s/pe_name.*/pe_name ${groupname}-smp/" > "${tmpfile}"
+    qconf -Ap "${tmpfile}"
+
+    qconf -sp "smp-verbose" | \
+      sed -e "s/pe_name.*/pe_name ${groupname}-smp-verbose/" > "${tmpfile}"
+    qconf -Ap "${tmpfile}"
+
+    # Add to queue's pe_list
+    qconf -sq "${groupname}.byslot.q" | \
+      sed -e "s/pe_list.*/pe_list ${groupname}-mpislots ${groupname}-mpislots-verbose ${groupname}-smp ${groupname}-smp-verbose/" > "${tmpfile}"
+    qconf -Mq "${tmpfile}"
+
+    rm -f "${tmpfile}"
+  fi
+else
+    echo "Locking failed; unable to add queues"
+fi

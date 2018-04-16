@@ -1,0 +1,11 @@
+location ~ ^/vpn/downloads/ {
+  auth_basic "Clusterware VPN access token";
+  auth_basic_user_file _ROOT_/etc/clusterware-www/auth/cluster-vpn.auth;
+  autoindex on;
+}
+
+location ~ ^/vpn/$ {
+  if ($is_prv_addr = 0) {
+    return 307 _REDIRECT_URL_;
+  }
+}
