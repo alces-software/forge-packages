@@ -1,0 +1,133 @@
+#%Module1.0#####################################################################
+##
+## Alces HPC Software Stack - Service module file
+## Copyright (c) 2018 Alces Software Ltd
+##
+## path: services/easybuild
+################################################################################
+if { [info exists ::env(ALCES_TRACE)] } {
+    puts stderr " -> $::ModulesCurrentModulefile"
+}
+
+if { [namespace exists alces] == 0 } {
+    if { [info exists ::env(MODULES_ALCES_TCL)] } {
+        source $::env(MODULES_ALCES_TCL)
+    } else {
+        # compatibility mode for module use without availability of Alces tools
+        proc ::process {body} { eval $body }
+        proc ::depend {module {version ""} {_ ""}} {
+            set req [regsub {\-} $module {/}]/$version
+            if { [catch { prereq $req }] } {
+                puts stderr "Could not satisfy prereq: $req"
+                break
+            }
+        }
+        proc ::alces {_ module} { return $module }
+        proc ::search {_ _ _} { }
+    }
+}
+
+proc ModulesHelp { } {
+    puts stderr "
+                =============== EasyBuild ===============
+A software installation framework in Python that allows you to install
+	       software in a structured and robust way.
+               ======================================
+
+This module sets up your environment for the use of the 'easybuild'
+service. This module sets up version '3.5.3' of the service.
+
+
+>> SYNOPSIS <<
+
+EasyBuild is a software build and installation framework that allows
+you to manage (scientific) software on High Performance Computing
+(HPC) systems in an efficient way. It is motivated by the need for a
+tool that combines the following features:
+
+  * a flexible framework for building/installing (scientific) software
+  * fully automates software builds
+  * divert from the standard configure / make / make install with
+    custom procedures
+  * allows for easily reproducing previous builds
+  * keep the software build recipes/specifications simple and
+    human-readable
+  * supports co-existence of versions/builds via dedicated
+    installation prefix and module files
+  * enables sharing with the HPC community (win-win situation)
+  * automagic dependency resolution
+  * retain logs for traceability of the build processes
+
+>> LICENSING <<
+
+This package is made available subject to the following license(s):
+
+\tGPLv2+
+
+Please visit the website for further details regarding licensing.
+
+
+>> FURTHER INFORMATION <<
+
+More information about this software can be found at the website:
+
+\thttp://easybuilders.github.io/easybuild/
+
+For further details regarding this module, including the environment
+modifications it will apply, execute:
+
+\tmodule show services/easybuild
+
+
+>> GET STARTED <<
+
+Please refer to the website for further details on usage of this
+package.
+"
+}
+
+set     app     easybuild
+set     version 3.5.3
+set     appcaps EASYBUILD
+set     appdir  /opt/clusterware/opt/easybuild
+
+module-whatis   "
+
+            Title: EasyBuild
+          Summary: EasyBuild package manager
+          License: GPLv2+
+            Group: Alces/Services
+              URL: http://easybuilders.github.io/easybuild/
+
+             Name: easybuild
+          Version: 3.5.3
+           Module: [alces pretty services/easybuild]
+      Module path: /opt/clusterware/etc/modules/services/easybuild
+     Package path: /opt/clusterware/opt/easybuild
+
+For further information, execute:
+
+\tmodule help services/easybuild
+"
+
+conflict EasyBuild
+
+set root ${appdir}/software/EasyBuild/3.5.3
+
+setenv ${appcaps}DIR ${appdir}
+setenv ${appcaps}BIN ${root}/bin
+
+setenv EBROOTEASYBUILD "$root"
+setenv EBVERSIONEASYBUILD "3.5.3"
+setenv EBDEVELEASYBUILD "$root/easybuild/EasyBuild-3.5.3-easybuild-devel"
+
+prepend-path PYTHONPATH $root/lib/python2.7/site-packages
+
+prepend-path PATH ${root}/bin
+prepend-path PATH /opt/clusterware/opt/modules/bin
+
+setenv EASYBUILD_ALLOW_MODULES_TOOL_MISMATCH 1
+setenv EASYBUILD_MODULE_SYNTAX Tcl
+setenv EASYBUILD_MODULES_TOOL EnvironmentModulesC
+
+prepend-path MODULEPATH $::env(HOME)/.local/easybuild/modules/all

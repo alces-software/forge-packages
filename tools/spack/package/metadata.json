@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "spack",
+    "version": "0.11.2+clusterware0",
+    "summary": "Install the Spack package manager",
+    "dependencies": [
+	"alces/modules"
+    ]
+  }
+}

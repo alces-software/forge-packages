@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "easybuild",
+    "version": "3.5.3+clusterware0",
+    "summary": "Install the Easybuild package manager",
+    "dependencies": [
+	"alces/modules"
+    ]
+  }
+}

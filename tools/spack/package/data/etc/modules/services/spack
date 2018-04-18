@@ -1,0 +1,130 @@
+#%Module1.0#####################################################################
+##
+## Alces HPC Software Stack - Service module file
+## Copyright (c) 2018 Alces Software Ltd
+##
+## path: services/spack
+################################################################################
+if { [info exists ::env(ALCES_TRACE)] } {
+    puts stderr " -> $::ModulesCurrentModulefile"
+}
+
+if { [namespace exists alces] == 0 } {
+    if { [info exists ::env(MODULES_ALCES_TCL)] } {
+        source $::env(MODULES_ALCES_TCL)
+    } else {
+        # compatibility mode for module use without availability of Alces tools
+        proc ::process {body} { eval $body }
+        proc ::depend {module {version ""} {_ ""}} {
+            set req [regsub {\-} $module {/}]/$version
+            if { [catch { prereq $req }] } {
+                puts stderr "Could not satisfy prereq: $req"
+                break
+            }
+        }
+        proc ::alces {_ module} { return $module }
+        proc ::search {_ _ _} { }
+    }
+}
+
+proc ModulesHelp { } {
+    puts stderr "
+                =============== Spack ===============
+     A flexible package manager that supports multiple versions,
+	      configurations, platforms, and compilers.
+               ======================================
+
+This module sets up your environment for the use of the 'spack'
+service. This module sets up version '0.11.2' of the service.
+
+
+>> SYNOPSIS <<
+
+Spack is a package manager for supercomputers, Linux, and macOS. It
+makes installing scientific software easy. With Spack, you can build a
+package with multiple versions, configurations, platforms, and
+compilers, and all of these builds can coexist on the same machine.
+
+Spack isn't tied to a particular language; you can build a software
+stack in Python or R, link to libraries written in C, C++, or Fortran,
+and easily swap compilers. Use Spack to install in your home
+directory, to manage shared installations and modules on a cluster, or
+to build combinatorial versions of software for testing.
+
+>> LICENSING <<
+
+This package is made available subject to the following license(s):
+
+\tLGPLv2.1+
+
+Please visit the website for further details regarding licensing.
+
+
+>> FURTHER INFORMATION <<
+
+More information about this software can be found at the website:
+
+\thttps://spack.io/
+
+For further details regarding this module, including the environment
+modifications it will apply, execute:
+
+\tmodule show services/spack
+
+
+>> GET STARTED <<
+
+Please refer to the website for further details on usage of this
+package.
+"
+}
+
+set     app     spack
+set     version 0.11.2
+set     appcaps SPACK
+set     appdir  /opt/clusterware/opt/spack
+
+module-whatis   "
+
+            Title: Spack
+          Summary: Spack package manager
+          License: LGPLv2.1+
+            Group: Alces/Services
+              URL: https://spack.io/
+
+             Name: spack
+          Version: 0.11.2
+           Module: [alces pretty services/spack]
+      Module path: /opt/clusterware/etc/modules/services/spack
+     Package path: /opt/clusterware/opt/spack
+
+For further information, execute:
+
+\tmodule help services/spack
+"
+
+setenv ${appcaps}DIR ${appdir}
+setenv ${appcaps}BIN ${appdir}/bin
+
+setenv SPACK_ROOT ${appdir}
+set spack_data ""
+if { [module-info shell] == "bash" } {
+  setenv SPACK_SHELL bash
+  if { [module-info mode load] } {
+    set spack_data "source ${appdir}/share/spack/setup-env.sh;"
+  }
+} elseif { [module-info shell] == "tcsh" } {
+  setenv SPACK_SHELL tcsh
+  if { [module-info mode load] } {
+    set spack_data "source ${appdir}/share/spack/setup-env.csh;"
+  }
+} elseif { [module-info shell] == "zsh" } {
+  setenv SPACK_SHELL zsh
+  if { [module-info mode load] } {
+    set spack_data "source ${appdir}/share/spack/setup-env.sh;"
+  }
+}
+
+prepend-path PATH ${appdir}/bin
+
+puts $spack_data
