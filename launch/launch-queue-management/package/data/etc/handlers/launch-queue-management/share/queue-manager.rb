@@ -22,6 +22,7 @@
 require 'json'
 require 'open-uri'
 require 'ostruct'
+require 'open3'
 
 ACTION_TO_COMPUTE_COMMAND = {
   'CREATE' => 'addq',
@@ -36,6 +37,16 @@ ACTION_TO_VERB = {
 }.freeze
 
 class Retry < RuntimeError; end
+
+class Result < Struct.new(:output, :status)
+  def operation_in_progress?
+    output =~ /operation in progress/
+  end
+
+  def success?
+    status.exitstatus == 0
+  end
+end
 
 class Resource < Struct.new(:id, :type, :attributes, :links, :auth_user, :auth_password)
   def self.build(jsonapi_doc, auth_user, auth_password)
@@ -98,14 +109,9 @@ def process_queue_action(queue_action)
       qa.desired.to_s,
       qa.min.to_s,
       qa.max.to_s,
-      :err=>[:child, :out]
     ]
-    IO.popen(cmd) do |io|
-      while !io.eof?
-        line = io.readline
-        log(line)
-        raise Retry.new if line =~ /operation in progress/
-      end
+    Result.new(*Open3.capture2e(*cmd)).tap do |result|
+      raise Retry.new if result.operation_in_progress?
     end
   rescue Retry
     if (@retries += 1) < 20
@@ -128,8 +134,12 @@ def main(endpoint, auth_user, auth_password)
     end
     resources.each do |queue_action|
       queue_action.patch(status: 'IN_PROGRESS')
-      process_queue_action(queue_action)
-      queue_action.patch(status: 'COMPLETE')
+      result = process_queue_action(queue_action)
+      if result.success?
+        queue_action.patch(status: 'COMPLETE')
+      else
+        queue_action.patch(status: 'FAILED', output: result.output)
+      end
     end
   ensure
     @log && @log.close
