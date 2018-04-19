@@ -37,6 +37,7 @@ ACTION_TO_VERB = {
 }.freeze
 
 class Retry < RuntimeError; end
+class OperationInProgress < RuntimeError; end
 
 class Result < Struct.new(:output, :status)
   def operation_in_progress?
@@ -118,6 +119,8 @@ def process_queue_action(queue_action)
       log('Operation in progress; retrying in 6s...')
       sleep 6
       retry
+    else
+      raise OperationInProgress
     end
   end
 end
@@ -134,11 +137,22 @@ def main(endpoint, auth_user, auth_password)
     end
     resources.each do |queue_action|
       queue_action.patch(status: 'IN_PROGRESS')
-      result = process_queue_action(queue_action)
-      if result.success?
-        queue_action.patch(status: 'COMPLETE')
+      begin
+        result = process_queue_action(queue_action)
+      rescue OperationInProgress
+        # The action was not accepted due to another being in progress.
+        # Setting its status back to PENDING and aborting all other actions
+        # ensures that we will eventually process the actions in the correct
+        # order.
+        log('Operation in progress; aborting all further processing')
+        queue_action.patch(status: 'PENDING')
+        break
       else
-        queue_action.patch(status: 'FAILED', output: result.output)
+        if result.success?
+          queue_action.patch(status: 'COMPLETE')
+        else
+          queue_action.patch(status: 'FAILED', output: result.output)
+        end
       end
     end
   ensure
