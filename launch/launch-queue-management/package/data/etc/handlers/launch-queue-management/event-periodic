@@ -60,6 +60,13 @@ end
 RUBY
 }
 
+_queues_auth_password() {
+  if [ -z "${cw_CLUSTER_auth_token}" ]; then
+      files_load_config auth config/cluster
+  fi
+  echo "${cw_CLUSTER_auth_token}"
+}
+
 _queues_cluster_uuid() {
   if [ -z "${cw_CLUSTER_uuid}" ]; then
       files_load_config config config/cluster
@@ -75,13 +82,18 @@ _queues_endpoint() {
 
 main() {
   _queues_load_personality
-  local feature_dir
+  local auth_user
   files_load_config instance config/cluster
   if [ "${cw_INSTANCE_role}" != "master" ]; then
       return 0
   fi
 
-  ruby_exec "$(handler_dir)/share/queue-manager.rb" "${_ALCES}" "$(_queues_endpoint)"
+  auth_user=$(_queues_cluster_uuid)
+  ruby_exec "$(handler_dir)/share/queue-manager.rb" \
+      "${_ALCES}" \
+      "$(_queues_endpoint)" \
+      "$(auth_user)" \
+      "$(_queues_auth_password)"
 }
 
 setup
