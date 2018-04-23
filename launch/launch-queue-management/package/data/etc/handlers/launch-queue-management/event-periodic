@@ -92,6 +92,7 @@ main() {
         local auth_user
 
         auth_user=$(_queues_cluster_uuid)
+        export cw_UI_disable_spinner=true
         ruby_exec "$(handler_dir)/share/queue-manager.rb" \
             "${_ALCES}" \
             "$(_queues_endpoint)" \

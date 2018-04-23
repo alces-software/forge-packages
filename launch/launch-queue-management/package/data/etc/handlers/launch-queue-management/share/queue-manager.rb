@@ -151,7 +151,8 @@ def main(endpoint, auth_user, auth_password)
         if result.success?
           queue_action.patch(status: 'COMPLETE')
         else
-          queue_action.patch(status: 'FAILED', output: result.output)
+          cleaned_output = result.output.gsub(/\e\[[0-9;]*m/, '')
+          queue_action.patch(status: 'FAILED', output: cleaned_output)
         end
       end
     end
