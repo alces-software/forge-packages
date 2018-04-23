@@ -129,7 +129,7 @@ end
 def main(endpoint, auth_user, auth_password)
   begin
     response = download_pending_actions(endpoint, auth_user, auth_password)
-  rescue OpenURI::HTTPError
+  rescue OpenURI::HTTPError, Errno::ECONNREFUSED
     log("Download failed: #{$!.message}")
   else
     log("Processing #{response['data'].length} pending actions")
