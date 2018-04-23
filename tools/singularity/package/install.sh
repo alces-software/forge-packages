@@ -57,9 +57,7 @@ Once enabled you can then use Singularity by running:
 EOF
 }
 
-setup
-
 _VERSION="2.4"
-_RESOURCES_DIR="resources"
+_RESOURCES_DIR="$(pwd)/resources"
 
 main "$@"
