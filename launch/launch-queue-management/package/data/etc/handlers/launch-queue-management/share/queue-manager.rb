@@ -112,6 +112,7 @@ def process_queue_action(queue_action)
       qa.max.to_s,
     ]
     Result.new(*Open3.capture2e(*cmd)).tap do |result|
+      result.output.lines.each {|line| log(line.chomp)}
       raise Retry.new if result.operation_in_progress?
     end
   rescue Retry
