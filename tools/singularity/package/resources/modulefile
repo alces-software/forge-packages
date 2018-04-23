@@ -1,0 +1,78 @@
+#%Module1.0#####################################################################
+##
+## Alces HPC Software Stack - Compiler module file
+## Copyright (c) 2017 Alces Software Ltd
+##
+## path: apps/singularity/2.4
+################################################################################
+
+if { [info exists ::env(ALCES_TRACE)] } {
+    puts stderr " -> $::ModulesCurrentModulefile"
+}
+
+if { [namespace exists alces] == 0 } {
+    if { [info exists ::env(MODULES_ALCES_TCL)] } {
+        source $::env(MODULES_ALCES_TCL)
+    } else {
+        # compatibility mode for module use without availability of Alces tools
+        proc ::process {body} { eval $body }
+        proc ::depend {module {version ""} {_ ""}} {
+            set req [regsub {\-} $module {/}]/$version
+            if { [catch { prereq $req }] } {
+                puts stderr "Could not satisfy prereq: $req"
+                break
+            }
+        }
+        proc ::alces {_ module} { return $module }
+        proc ::search {_ _ _} { }
+    }
+}
+
+proc ModulesHelp { } {
+    puts stderr "
+              ================ singularity ================
+                      Singularity Container Platform
+              =============================================
+
+This module sets up your environment for the use of the 'singularity' applications
+in conjuction with the 'singularity' feature profile available through Alces 
+Clusterware.
+
+>> FURTHER INFORMATION <<
+
+More information about this software can be found at the website:
+
+\thttp://singularity.lbl.gov/
+
+For further details regarding this module, including the environment modifications
+it will apply, execute:
+
+\tmodule show apps/singularity/2.4
+
+"
+}
+
+set     app     singularity
+set     version 2.4
+set     appcaps SINGULARITY
+set     appdir  /opt/apps/singularity
+
+module-whatis   "
+
+            Title: singularity
+          Summary: Singularity Container Platform
+            Group: Alces/Apps
+              URL: http://singularity.lbl.gov/
+
+             Name: singularity
+          Version: 2.4
+           Module: [alces pretty apps/singularity/2.4]
+      Module Path: /opt/apps/etc/modules/apps/singularity/2.4
+     Package Path: /opt/apps/singularity
+
+For further information, execute:
+
+\tmodule help apps/singularity/2.4
+"
+
+prepend-path PATH ${appdir}/bin
