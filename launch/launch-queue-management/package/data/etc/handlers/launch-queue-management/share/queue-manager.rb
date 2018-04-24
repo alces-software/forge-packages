@@ -157,6 +157,7 @@ def main(endpoint, auth_user, auth_password)
         end
       end
     end
+    log("Processing completed")
   ensure
     @log && @log.close
   end
