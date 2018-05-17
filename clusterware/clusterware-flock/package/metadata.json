@@ -1,0 +1,13 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "clusterware-flock",
+    "version": "2.0.0-dev",
+    "summary": "Alces Flock integration for Clusterware",
+    "username": "alces",
+    "dependencies": [
+      "alces/flock-cli",
+      "alces/clusterware-fshelper"
+    ]
+  }
+}
