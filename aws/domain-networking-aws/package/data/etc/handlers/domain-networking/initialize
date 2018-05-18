@@ -20,29 +20,34 @@
 # For more information on the Alces Clusterware, please visit:
 # https://github.com/alces-software/clusterware
 #==============================================================================
-if [ -d "${cw_ROOT}"/etc/config/domain-networking ]; then
-    echo "Domain networking configuration has already been completed"
-    exit 0
-fi
-curl -o /tmp/bumblebee.tar.gz https://s3-eu-west-1.amazonaws.com/packages.alces-software.com/clusterware/dist/private/el7/bumblebee.tar.gz
-cd /opt
-tar xvzf /tmp/bumblebee.tar.gz
-cd bumblebee
-. "${cw_ROOT}"/etc/ruby.rc
-bundle install --local --path=vendor
-export BUMBLEBEE_CONFIG="${cw_ROOT}"/etc/bumblebee.yml
-while [ ! -f "${BUMBLEBEE_CONFIG}" ]; do
-    sleep 1
-    c=$(($c+1))
-    if [ $c -gt 120 ]; then
-        echo "No bumblebee configuration file was found after 120s."
-        exit 1
+if curl http://169.254.169.254/latest/user-data | grep -q 'etc/bumblebee.yml'; then
+    echo "Domain networking required."
+    if [ -d "${cw_ROOT}"/etc/config/domain-networking ]; then
+        echo "Domain networking configuration has already been completed"
+        exit 0
     fi
-done
-if bin/bumblebee configure; then
-    mkdir -p "${cw_ROOT}"/etc/config/domain-networking
-    # Disable cloud-init's management of hostname
-    sed -i -e 's/^preserve_hostname: false/preserve_hostname: true/g' /etc/cloud/cloud.cfg
-    sed -i -e 's/#\?cw_CLUSTERABLE_manage_hostname=.*/cw_CLUSTERABLE_manage_hostname=false/g' \
-        /opt/clusterware/etc/clusterable.rc
+    curl -o /tmp/bumblebee.tar.gz https://s3-eu-west-1.amazonaws.com/packages.alces-software.com/clusterware/dist/private/el7/bumblebee.tar.gz
+    cd /opt
+    tar xvzf /tmp/bumblebee.tar.gz
+    cd bumblebee
+    . "${cw_ROOT}"/etc/ruby.rc
+    bundle install --local --path=vendor
+    export BUMBLEBEE_CONFIG="${cw_ROOT}"/etc/bumblebee.yml
+    while [ ! -f "${BUMBLEBEE_CONFIG}" ]; do
+      sleep 1
+      c=$(($c+1))
+      if [ $c -gt 120 ]; then
+          echo "No bumblebee configuration file was found after 120s."
+          exit 1
+      fi
+    done
+    if bin/bumblebee configure; then
+        mkdir -p "${cw_ROOT}"/etc/config/domain-networking
+        # Disable cloud-init's management of hostname
+        sed -i -e 's/^preserve_hostname: false/preserve_hostname: true/g' /etc/cloud/cloud.cfg
+        sed -i -e 's/#\?cw_CLUSTERABLE_manage_hostname=.*/cw_CLUSTERABLE_manage_hostname=false/g' \
+            /opt/clusterware/etc/clusterable.rc
+    fi
+else
+  echo "Domain networking not required."
 fi
