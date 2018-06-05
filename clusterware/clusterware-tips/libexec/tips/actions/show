@@ -1,0 +1,111 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Clusterware.
+#
+# Alces Clusterware is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Alces Clusterware is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Alces Clusterware, please visit:
+# https://github.com/alces-software/clusterware
+#==============================================================================
+require action
+require document
+
+_render_tip() {
+  local tip
+  tip="$1"
+  if [ "$short" ]; then
+      content=$(grep ^% "${tip}" | cut -c2-)
+      echo "[37;4;1mTIP:[0m $content" | \
+          sed -e 's/`\([^`]*\)`/[37;1m`[48;5;68m\1[49m`[0m/g'
+  else
+    tail -n+3 "$tip" | \
+        sed -e 's/`\([^`]*\)`/[37;1m`[48;5;68m\1[49m`[0m/g'
+  fi
+}
+
+_show_tip() {
+  local tip idx
+  idx="$1"
+  if tip="$(document_get "$idx" tips .tip)"; then
+      _render_tip "${tip}"
+  elif tips=($(_filter_tips "$idx")); then
+      _render_tip "${tips[0]}"
+  else
+    return $?
+  fi
+}
+
+_filter_tips() {
+  local tips topic list
+  topic="$1"
+  list=()
+  if tips=($(document_list tips .tip)); then
+      if [ -z "$topic" ]; then
+          echo "${tips[@]}"
+      else
+        for a in "${tips[@]}"; do
+          if grep -iq "#${topic}" $a; then
+              list+=($a)
+          fi
+        done
+        if [ "${#list[@]}" -gt 0 ]; then
+            echo "${list[@]}"
+        else
+          return 1
+        fi
+      fi
+  else
+    return $?
+  fi
+}
+
+_random_tip() {
+  local tips picked
+  if tips=($(_filter_tips "$1")); then
+      picked=$(($RANDOM%${#tips[@]}+1))
+      _show_tip "${picked}"
+  else
+    action_die "couldn't find any tips with topic: $1"
+  fi
+}
+
+main() {
+    local idx short random
+    if [ "$1" == "--short" ]; then
+        short=true
+        shift
+    fi
+    if [ "$1" == "--random" ]; then
+        random=true
+        shift
+    fi
+    idx="$1"
+    if [ "$random" ]; then
+        _random_tip "${idx}"
+    elif ! _show_tip "${idx}"; then
+        errlvl=$?
+        if [ $errlvl == 1 ]; then
+            action_die "no tips found"
+        elif [ $errlvl == 3 ]; then
+            action_die "please specify a name"
+        else
+            action_die "couldn't find any tips with topic: ${idx}"
+        fi
+    fi
+    action_cleanup
+}
+
+main "$@"

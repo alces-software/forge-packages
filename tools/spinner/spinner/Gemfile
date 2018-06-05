@@ -1,0 +1,9 @@
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Flight Flock.
+#==============================================================================
+source 'https://rubygems.org' do
+  gem 'whirly'
+  gem 'paint'
+end

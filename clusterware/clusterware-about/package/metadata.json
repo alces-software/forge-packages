@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "clusterware-about",
+    "version": "2.0.0-dev",
+    "summary": "Access to cluster-specific documentation",
+    "dependencies": [
+      "alces/clusterware-docs"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "clusterware-tips",
+    "version": "2.0.0-dev",
+    "summary": "Provides tips for using a Clusterware environment",
+    "dependencies": [
+      "alces/clusterware-docs"
+    ]
+  }
+}

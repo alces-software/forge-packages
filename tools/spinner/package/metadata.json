@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "spinner",
+    "version": "1.0.0",
+    "summary": "Simple busy spinner",
+    "dependencies": [
+    ]
+  }
+}

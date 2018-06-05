@@ -5,6 +5,9 @@
 ##
 ################################################################################
 if [ "$(id -u)" != "0" ]; then
+   "${cw_ROOT}"/libexec/share/spinner "Updating flock" &
+    spinner_pid="$!"
+    # XXX - verify flockd is running before we try any of this
     . "${cw_ROOT}"/etc/flock.rc
     cw_FLOCK_mnt="${cw_FLOCK_mnt:-/mnt/flight}"
     _ALCES="${cw_ROOT}"/bin/alces
@@ -38,4 +41,7 @@ if [ "$(id -u)" != "0" ]; then
     unset a b aa bb
     unset _token _sshkey _val _ALCES _md5
     unset cw_FLOCK_mnt
+    kill -USR1 $spinner_pid
+    wait $spinner_pid
+    unset spinner_pid
 fi
