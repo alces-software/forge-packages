@@ -77,6 +77,15 @@ require 'rubygems'
 require 'bundler'
 Bundler.setup(:default)
 
-require 'alces/packager/cli'
+# Redirect $stderr during require to suppress the :FixNum Deprecation warning
+# TODO: Fix ASAP by replacing offending gems
+require 'stringio'
+old_stderr = $stderr
+begin
+  $stderr = StringIO.new
+  require 'alces/packager/cli'
+ensure
+  $stderr = old_stderr
+end
 
 Alces::Packager::CLI.run! if $0 == __FILE__
