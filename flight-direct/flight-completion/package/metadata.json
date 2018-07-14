@@ -1,0 +1,10 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "flight-completion",
+    "version": "0.0.0",
+    "summary": "Bash completion for Flight Direct",
+    "dependencies": [
+    ]
+  }
+}
