@@ -5,5 +5,5 @@
 ##
 ################################################################################
 if [ -x "${cw_ROOT}"/libexec/share/setup-sshkey ]; then
-    "${cw_ROOT}"/libexec/share/setup-sshkey
+    flight bash "${cw_ROOT}"/libexec/share/setup-sshkey
 fi
