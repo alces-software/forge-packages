@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 package_name='clusterware-docs'
 cw_ROOT=${cw_ROOT:-/opt/clusterware}
 
