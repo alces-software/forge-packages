@@ -43,7 +43,7 @@ module FlightSyncer
 
     def save
       new_files_content_cache.each do |identifier, content|
-        path = File.join(self.class.public_dir, 'syncer', identifier.to_s)
+        path = File.join(self.class.public_dir, relative_identifier_path)
         FileUtils.mkdir_p(File.dirname(path))
         File.write(path, content)
       end

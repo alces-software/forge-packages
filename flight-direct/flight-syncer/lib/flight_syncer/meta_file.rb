@@ -34,6 +34,18 @@ module FlightSyncer
       HASH_ACCESSOR.map { |key| [key, public_send(key)] }.to_h
     end
 
+    def relative_identifier_path
+      File.join('syncer', identifier.to_s)
+    end
+
+    def url
+      key = 'FL_CONFIG_CACHE_URL'
+      raise <<-ERROR.squish unless ENV[key]
+        Can not determine the file location, please set: #{key}
+      ERROR
+      File.join(ENV[key], relative_identifier_path)
+    end
+
     def save_to_cache(content)
       SyncManifest.new.tap do |manifest|
         manifest.add_file(self, content)
