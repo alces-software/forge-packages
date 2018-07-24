@@ -13,7 +13,7 @@ cp -r * "${temp_dir}"
 mkdir -p "${temp_dir}/data"
 
 pushd .. > /dev/null
-bundle package --path vendor
+bundle install --standalone --path vendor
 popd > /dev/null
 
 rm -rf ../vendor/cache
