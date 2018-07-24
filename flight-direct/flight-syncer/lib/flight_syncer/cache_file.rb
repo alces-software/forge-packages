@@ -20,6 +20,12 @@ module FlightSyncer
           end
         end
       end
+
+      def build_from_hash(hash)
+        new.tap do |x|
+          hash.each { |key, value| x.public_send("#{key}=", value) }
+        end
+      end
     end
 
     HASH_ACCESSOR = [:identifier, :path, :mode, :owner, :group]

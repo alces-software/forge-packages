@@ -31,7 +31,9 @@ module FlightSyncer
     end
 
     def get_file(identifier)
-      (data[:files] ||= {})[identifier.to_sym]
+      raw = (data[:files] ||= {})[identifier.to_sym]
+      return if raw.nil? || raw.empty?
+      CacheFile.build_from_hash(raw)
     end
 
     def save
