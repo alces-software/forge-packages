@@ -28,5 +28,9 @@ module FlightSyncer
     def to_h
       HASH_ACCESSOR.map { |key| [key, public_send(key)] }.to_h
     end
+
+    def save_to_cache
+      SyncManifest.new.tap { |cache| cache.add_file(self) }.save
+    end
   end
 end

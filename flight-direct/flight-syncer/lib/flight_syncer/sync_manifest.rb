@@ -22,6 +22,18 @@ module FlightSyncer
       @data ||= self.class.read
     end
 
+    def add_file(file_model)
+      identifier = file_model.identifier.to_sym
+      raise <<-ERROR.squish if get_file(identifier)
+        A file has already been cached with the identifier: #{identifier}
+      ERROR
+      data[:files][identifier] = file_model.to_h
+    end
+
+    def get_file(identifier)
+      (data[:files] ||= {})[identifier.to_sym]
+    end
+
     def save
       File.write(self.class.path, YAML.dump(data.deep_stringify_keys))
     end
