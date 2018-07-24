@@ -4,5 +4,6 @@ require_relative File.join(
 )
 
 require 'active_support/core_ext/string'
+require 'active_support/core_ext/hash'
 require 'flight_syncer/cache_file'
 

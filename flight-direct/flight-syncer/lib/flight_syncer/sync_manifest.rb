@@ -1,4 +1,6 @@
 
+require 'yaml'
+
 module FlightSyncer
   class SyncManifest
     class << self
@@ -9,6 +11,19 @@ module FlightSyncer
         ERROR
         File.join(ENV[key], 'syncer-manifest.yaml')
       end
+
+      def read
+        return {} unless File.exists? path
+        (YAML.load_file(path) || {}).deep_symbolize_keys
+      end
+    end
+
+    def data
+      @data ||= self.class.read
+    end
+
+    def save
+      File.write(self.class.path, YAML.dump(data.deep_stringify_keys))
     end
   end
 end

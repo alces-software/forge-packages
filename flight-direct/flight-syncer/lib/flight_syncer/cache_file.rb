@@ -1,6 +1,7 @@
 
 require 'active_model'
 require 'etc'
+require 'flight_syncer/sync_manifest'
 
 module FlightSyncer
   class CacheFile
