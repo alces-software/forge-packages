@@ -21,6 +21,11 @@ module FlightSyncer
       end
     end
 
-    attr_accessor :identifier, :content, :path, :mode, :owner, :group
+    HASH_ACCESSOR = [:identifier, :path, :mode, :owner, :group]
+    attr_accessor(:content, *HASH_ACCESSOR)
+
+    def to_h
+      HASH_ACCESSOR.map { |key| [key, public_send(key)] }.to_h
+    end
   end
 end
