@@ -2,4 +2,7 @@
 
 require 'flight_syncer'
 
-
+desc 'add file', 'Add a file to the local cache'
+def add(path)
+  FlightSyncer::CacheFile.build_from_file(path)
+end
