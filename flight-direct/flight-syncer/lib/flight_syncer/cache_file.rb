@@ -12,7 +12,6 @@ module FlightSyncer
         new.tap do |x|
           File.open(path) do |file|
             x.identifier = File.basename(path, '.*')
-            x.content = File.read(path)
             x.path = path
             x.mode = file.stat.mode.to_s(8)
             x.owner = Etc.getpwuid(file.stat.uid).name
@@ -29,7 +28,7 @@ module FlightSyncer
     end
 
     HASH_ACCESSOR = [:identifier, :path, :mode, :owner, :group]
-    attr_accessor(:content, *HASH_ACCESSOR)
+    attr_accessor(*HASH_ACCESSOR)
 
     def to_h
       HASH_ACCESSOR.map { |key| [key, public_send(key)] }.to_h
