@@ -4,7 +4,7 @@ require 'etc'
 require 'flight_syncer/sync_manifest'
 
 module FlightSyncer
-  class CacheFile
+  class MetaFile
     include ActiveModel
 
     class << self
