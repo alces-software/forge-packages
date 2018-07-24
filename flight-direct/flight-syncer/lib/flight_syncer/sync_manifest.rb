@@ -26,13 +26,13 @@ module FlightSyncer
       @data ||= self.class.read
     end
 
-    def add_file(file_model, content)
-      identifier = file_model.identifier.to_sym
+    def add_file(metafile, content)
+      identifier = metafile.identifier.to_sym
       raise <<-ERROR.squish if get_file(identifier)
         A file has already been cached with the identifier: #{identifier}
       ERROR
-      new_files_content_cache[identifier] = content
-      data[:files][identifier] = file_model.to_h
+      new_files_content_cache[metafile] = content
+      data[:files][identifier] = metafile.to_h
     end
 
     def get_file(identifier)
@@ -42,8 +42,9 @@ module FlightSyncer
     end
 
     def save
-      new_files_content_cache.each do |identifier, content|
-        path = File.join(self.class.public_dir, relative_identifier_path)
+      new_files_content_cache.each do |metafile, content|
+        path = File.join(self.class.public_dir,
+                         metafile.relative_identifier_path)
         FileUtils.mkdir_p(File.dirname(path))
         File.write(path, content)
       end
