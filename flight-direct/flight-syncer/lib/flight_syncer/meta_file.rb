@@ -34,8 +34,10 @@ module FlightSyncer
       HASH_ACCESSOR.map { |key| [key, public_send(key)] }.to_h
     end
 
-    def save_to_cache
-      SyncManifest.new.tap { |cache| cache.add_file(self) }.save
+    def save_to_cache(content)
+      SyncManifest.new.tap do |manifest|
+        manifest.add_file(self, content)
+      end.save
     end
   end
 end
