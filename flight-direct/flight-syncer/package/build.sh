@@ -12,7 +12,7 @@ temp_dir=$(mktemp -d /tmp/${package_name}-build-XXXXX)
 cp -r * "${temp_dir}"
 mkdir -p "${temp_dir}/data"
 
-cp -pr ../etc ../scripts "${temp_dir}/data"
+cp -pr ../libexec ../lib "${temp_dir}/data"
 
 pushd "${temp_dir}" > /dev/null
 zip -r ${package_name}.zip *
