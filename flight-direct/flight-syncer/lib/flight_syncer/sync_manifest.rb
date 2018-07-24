@@ -5,16 +5,20 @@ module FlightSyncer
   class SyncManifest
     class << self
       def path
-        key = 'FL_CONFIG_PUBLIC_DIR'
-        raise <<-ERROR.squish unless ENV[key]
-          Can not locate the sync manifest, please set #{key}
-        ERROR
-        File.join(ENV[key], 'syncer-manifest.yaml')
+        File.join(public_dir, 'syncer-manifest.yaml')
       end
 
       def read
         return {} unless File.exists? path
         (YAML.load_file(path) || {}).deep_symbolize_keys
+      end
+
+      def public_dir
+        key = 'FL_CONFIG_PUBLIC_DIR'
+        raise <<-ERROR.squish unless ENV[key]
+          Can not locate the sync manifest, please set #{key}
+        ERROR
+        ENV[key]
       end
     end
 
