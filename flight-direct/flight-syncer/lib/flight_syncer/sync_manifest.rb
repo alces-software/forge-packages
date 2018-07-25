@@ -42,14 +42,14 @@ module FlightSyncer
 
     def add_file(metafile, content)
       identifier = metafile.identifier.to_sym
-      raise <<-ERROR.squish if get_file(identifier)
+      raise <<-ERROR.squish if get_metafile(identifier)
         A file has already been cached with the identifier: #{identifier}
       ERROR
       new_files_content_cache[metafile] = content
       data[:files][identifier] = metafile.to_h
     end
 
-    def get_file(identifier)
+    def get_metafile(identifier)
       raw = (data[:files] ||= {})[identifier.to_sym]
       return if raw.nil? || raw.empty?
       MetaFile.build_from_hash(raw)
