@@ -46,7 +46,11 @@ module FlightSyncer
 
     def save_from_cache
       io = URI.parse(url).open
-      File.write(sync_path, io.read)
+      File.open(sync_path, 'w') do |file|
+        file.write(io.read)
+        file.chown(uid, gid)
+        file.chmod(mode.to_i(8))
+      end
     end
 
     private
@@ -60,6 +64,14 @@ module FlightSyncer
     def url
       cache_url = FlightConfig.get('cache-url', allow_missing: false)
       File.join(cache_url, relative_identifier_path)
+    end
+
+    def uid
+      Etc.getpwnam(owner).uid
+    end
+
+    def gid
+      Etc.getgrnam(group).gid
     end
   end
 end
