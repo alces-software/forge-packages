@@ -13,10 +13,11 @@ cp -r * "${temp_dir}"
 mkdir -p "${temp_dir}/data"
 
 pushd .. > /dev/null
-bundle install --standalone --path vendor
+rm -rf vendor
+bundle install --standalone --path vendor/flight-syncer
 popd > /dev/null
 
-rm -rf ../vendor/cache
+rm -rf ../vendor/flight-syncer/cache
 cp -pr ../.bundle ../libexec ../lib ../vendor "${temp_dir}/data"
 
 pushd "${temp_dir}" > /dev/null

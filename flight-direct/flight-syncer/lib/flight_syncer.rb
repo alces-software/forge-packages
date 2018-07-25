@@ -1,6 +1,6 @@
 
 require_relative File.join(
-  File.dirname(__FILE__), '../vendor/bundler/setup.rb'
+  File.dirname(__FILE__), '../vendor/flight-syncer/bundler/setup.rb'
 )
 
 require 'active_support/core_ext/string'
