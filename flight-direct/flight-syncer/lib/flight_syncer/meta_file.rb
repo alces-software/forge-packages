@@ -38,15 +38,28 @@ module FlightSyncer
       File.join('syncer', identifier.to_s)
     end
 
-    def url
-      cache_url = FlightConfig.get('cache-url', allow_missing: false)
-      File.join(cache_url, relative_identifier_path)
-    end
-
     def save_to_cache(content)
       SyncManifest.new.tap do |manifest|
         manifest.add_file(self, content)
       end.save
+    end
+
+    def save_from_cache
+      io = URI.parse(url).open
+      File.write(sync_path, io.read)
+    end
+
+    private
+
+    # The sync_path is not guaranteed to always be the same as the path
+    # (due to system configuration). The `path` method denotes
+    # what is saved into the SyncManifest only. `sync_code` however will
+    # contain more advanced features TBA
+    alias_method :sync_path, :path
+
+    def url
+      cache_url = FlightConfig.get('cache-url', allow_missing: false)
+      File.join(cache_url, relative_identifier_path)
     end
   end
 end

@@ -17,7 +17,7 @@ def file(*identifiers)
           Warning: Could not locate '#{identifier}' file in sync manifest
         WARN
       else
-        binding.pry
+        metafile.save_from_cache
       end
     end
   end
