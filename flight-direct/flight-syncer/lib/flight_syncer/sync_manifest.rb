@@ -18,6 +18,10 @@ module FlightSyncer
       end
     end
 
+    def new(path: nil)
+      @manifest_path = path || self.class.path
+    end
+
     def data
       @data ||= self.class.read
     end
@@ -44,10 +48,12 @@ module FlightSyncer
         FileUtils.mkdir_p(File.dirname(path))
         File.write(path, content)
       end
-      File.write(self.class.path, YAML.dump(data.deep_stringify_keys))
+      File.write(manifest_path, YAML.dump(data.deep_stringify_keys))
     end
 
     private
+
+    attr_reader :manifest_path
 
     def new_files_content_cache
       @new_file_content_cache ||= {}
