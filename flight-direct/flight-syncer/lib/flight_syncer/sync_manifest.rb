@@ -1,29 +1,43 @@
 
 require 'yaml'
+require 'open-uri'
 
 module FlightSyncer
   class SyncManifest
     class << self
       def path
-        File.join(public_dir, 'syncer-manifest.yaml')
-      end
-
-      def read
-        return {} unless File.exists? path
-        (YAML.load_file(path) || {}).deep_symbolize_keys
+        File.join(public_dir, file_name)
       end
 
       def public_dir
         FlightConfig.get('public-dir', allow_missing: false)
       end
+
+      def remote
+        file = Tempfile.open(file_name)
+        cache_url = FlightConfig.get('cache-url', allow_missing: false)
+        io = URI.parse(File.join(cache_url, file_name)).open
+        file.write(io.read)
+        file.flush
+        yield new(path: file.path) if block_given?
+      ensure
+        file.close
+        file.unlink
+      end
+
+      private
+
+      def file_name
+        'syncer-manifest.yaml'
+      end
     end
 
-    def new(path: nil)
+    def initialize(path: nil)
       @manifest_path = path || self.class.path
     end
 
     def data
-      @data ||= self.class.read
+      @data ||= read
     end
 
     def add_file(metafile, content)
@@ -57,6 +71,11 @@ module FlightSyncer
 
     def new_files_content_cache
       @new_file_content_cache ||= {}
+    end
+
+    def read
+      return {} unless File.exists? manifest_path
+      (YAML.load_file(manifest_path) || {}).deep_symbolize_keys
     end
   end
 end
