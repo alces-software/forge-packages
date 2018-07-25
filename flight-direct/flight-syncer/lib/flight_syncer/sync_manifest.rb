@@ -14,11 +14,7 @@ module FlightSyncer
       end
 
       def public_dir
-        key = 'FL_CONFIG_PUBLIC_DIR'
-        raise <<-ERROR.squish unless ENV[key]
-          Can not locate the sync manifest, please set #{key}
-        ERROR
-        ENV[key]
+        FlightConfig.get('public-dir', allow_missing: false)
       end
     end
 

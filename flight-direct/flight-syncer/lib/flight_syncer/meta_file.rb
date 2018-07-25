@@ -39,11 +39,8 @@ module FlightSyncer
     end
 
     def url
-      key = 'FL_CONFIG_CACHE_URL'
-      raise <<-ERROR.squish unless ENV[key]
-        Can not determine the file location, please set: #{key}
-      ERROR
-      File.join(ENV[key], relative_identifier_path)
+      cache_url = FlightConfig.get('cache-url', allow_missing: false)
+      File.join(cache_url, relative_identifier_path)
     end
 
     def save_to_cache(content)
