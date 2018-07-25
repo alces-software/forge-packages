@@ -9,8 +9,16 @@ def add(path)
 end
 
 desc 'file identifier', 'Sync a file from the cache'
-def file(identifier)
+def file(*identifiers)
   FlightSyncer::SyncManifest.remote do |manifest|
-    binding.pry
+    identifiers.each do |identifier|
+      if (metafile = manifest.get_metafile(identifier)).nil?
+        $stderr.puts <<-WARN.strip_heredoc
+          Warning: Could not locate '#{identifier}' file in sync manifest
+        WARN
+      else
+        binding.pry
+      end
+    end
   end
 end
