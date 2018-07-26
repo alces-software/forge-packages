@@ -3,9 +3,13 @@
 require 'flight_syncer'
 
 desc 'add file', 'Add a file to the local cache'
+method_option :path, desc: <<-DESC.squish
+  Sets the sync path of the file. Defaults to the file input path
+DESC
 def add(path)
   content = File.read(path)
-  FlightSyncer::MetaFile.build_from_file(path).save_to_cache(content)
+  FlightSyncer::MetaFile.build_from_file(path, **options.symbolize_keys)
+                        .save_to_cache(content)
 end
 
 desc 'file identifiers...', 'Sync a file from the cache'

@@ -8,14 +8,14 @@ module FlightSyncer
     include ActiveModel
 
     class << self
-      def build_from_file(path)
-        new.tap do |x|
+      def build_from_file(path, **options)
+        new(**options).tap do |x|
           File.open(path) do |file|
-            x.identifier = File.basename(path, '.*')
-            x.path = path
-            x.mode = file.stat.mode.to_s(8)
-            x.owner = Etc.getpwuid(file.stat.uid).name
-            x.group = Etc.getgrgid(file.stat.gid).name
+            x.identifier ||= File.basename(path, '.*')
+            x.path ||= path
+            x.mode ||= file.stat.mode.to_s(8)
+            x.owner ||= Etc.getpwuid(file.stat.uid).name
+            x.group ||= Etc.getgrgid(file.stat.gid).name
           end
         end
       end
@@ -25,6 +25,10 @@ module FlightSyncer
           hash.each { |key, value| x.public_send("#{key}=", value) }
         end
       end
+    end
+
+    def initialize(**parameters)
+      parameters.each { |key, value| public_send("#{key}=", value) }
     end
 
     HASH_ACCESSOR = [:identifier, :path, :mode, :owner, :group]
