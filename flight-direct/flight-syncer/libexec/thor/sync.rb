@@ -2,7 +2,7 @@
 
 require 'flight_syncer'
 
-desc 'add file', 'Add a file to the local cache'
+desc 'add FILE', 'Add a file to the local cache'
 METAFILE_PARAMS = {
   path: 'The sync path of the file',
   identifier: 'A unique refernce to the file, defaults to the basename',
@@ -21,7 +21,7 @@ def add(path)
                         .save_to_cache(content)
 end
 
-desc 'file identifiers...', 'Sync a file from the cache'
+desc 'file IDENTIFIER...', 'Sync a file from the cache'
 def file(*identifiers)
   FlightSyncer::SyncManifest.remote do |manifest|
     identifiers.each do |identifier|
