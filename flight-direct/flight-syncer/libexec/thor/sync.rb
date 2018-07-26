@@ -3,7 +3,7 @@
 require 'flight_syncer'
 
 desc 'add file', 'Add a file to the local cache'
-{
+METAFILE_PARAMS = {
   path: 'The sync path of the file',
   identifier: 'A unique refernce to the file, defaults to the basename',
   mode: 'Sets the file permissions as an octal',
@@ -14,7 +14,10 @@ desc 'add file', 'Add a file to the local cache'
 end
 def add(path)
   content = File.read(path)
-  FlightSyncer::MetaFile.build_from_file(path, **options.symbolize_keys)
+  params = options.symbolize_keys.select do |k, _v|
+    METAFILE_PARAMS.keys.include?(k)
+  end
+  FlightSyncer::MetaFile.build_from_file(path, **params)
                         .save_to_cache(content)
 end
 
