@@ -11,8 +11,8 @@ module FlightSyncer
       def build_from_file(path, **options)
         new(**options).tap do |x|
           File.open(path) do |file|
-            x.identifier ||= File.basename(path, '.*')
             x.path ||= path
+            x.identifier ||= File.basename(x.path, '.*')
             x.mode ||= file.stat.mode.to_s(8)
             x.owner ||= Etc.getpwuid(file.stat.uid).name
             x.group ||= Etc.getgrgid(file.stat.gid).name
