@@ -11,7 +11,7 @@ template = File.read(
   File.join(FlightDirect.root_dir, 'scripts/bash_completion.sh.erb')
 )
 context = FlightDirect::CLI.instance_eval { binding }
-completion = ERB.new(template).result(context)
+completion = ERB.new(template, nil, '-').result(context)
 file = File.join(FlightDirect.root_dir, 'scripts/bash_completion.sh')
 File.write(file, completion)
 

@@ -10,26 +10,26 @@ _flight_complete() {
   <% Dir.glob("#{ENV['FL_ROOT']}/libexec/*")
         .reject { |a| File.basename(a) == 'actions' }
         .each do |cmd_dir|
-  %>
+  -%>
   elif [[ '<%= File.basename(cmd_dir) %>' == "${COMP_WORDS[1]}" ]]; then
     <% init_subcmds = Dir.glob("#{cmd_dir}/actions/*").map do |cmd_path|
          File.basename(cmd_path)
        end.sort
-    %>
+    -%>
     if [[ $COMP_CWORD == 2 ]]; then
       <% cmds = init_subcmds.reject { |c| c.include?('_') }
          init_subcmds.delete_if { |c| cmds.include?(c) }
-      %>
+      -%>
       COMPREPLY=($(compgen -W '<%= cmds.join(' ') %>' -- "$cur"))
-      <% groups = init_subcmds.each_with_object({}) do |cmd, memo|
+      <% init_subcmds.each_with_object({}) do |cmd, memo|
         prefix = /\A[^_]*_/.match(cmd).to_s
         (memo[prefix.chomp('_')] ||= []).push(cmd.sub(prefix, ''))
-      end.each do |group, subsubcmds| %>
+      end.each do |group, subsubcmds| -%>
     elif [[ '<%= group %>' == "${COMP_WORDS[2]}" ]]; then
       COMPREPLY=($(compgen -W '<%= subsubcmds.join(' ') %>' -- "$cur"))
-      <% end %>
+      <% end -%>
     fi
-  <% end %>
+  <% end -%>
   fi
 
   # Fall back if empty
