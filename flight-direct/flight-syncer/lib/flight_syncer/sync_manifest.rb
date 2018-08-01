@@ -25,6 +25,10 @@ module FlightSyncer
         file.unlink
       end
 
+      def update
+        new.tap { |x| yield x }.save
+      end
+
       private
 
       def file_name
@@ -47,6 +51,15 @@ module FlightSyncer
       ERROR
       new_files_content_cache[metafile] = content
       data[:files][identifier] = metafile.to_h
+    end
+
+    def add_files_to_group(group, *files)
+      files_union = files_in_group(group) | files
+      (data[:groups] ||= {})[group.to_sym] = files_union
+    end
+
+    def files_in_group(group)
+      Array.wrap((data[:groups] || {})[group.to_sym])
     end
 
     def get_metafile(identifier)

@@ -40,3 +40,19 @@ def file(*identifiers)
     end
   end
 end
+
+class Group < Thor
+  # Only show the 'add' command if on the cache server (aka the public dir
+  # has been defined)
+  if FlightConfig.get('public-dir')
+    desc 'add GROUP FILES...', 'Add files to a group'
+    def add(group, *files)
+      FlightSyncer::SyncManifest.update do |manifest|
+        manifest.add_files_to_group(group, *files)
+      end
+    end
+  end
+end
+desc 'group SUBCOMMAND ...ARGS', 'Manage syncing a group of files'
+subcommand 'group', Group
+
