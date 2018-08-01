@@ -52,6 +52,15 @@ class Group < Thor
       end
     end
   end
+
+  desc 'get GROUP', 'Sync all the files within the group'
+  def get(group)
+    FlightSyncer::SyncManifest.remote do |manifest|
+      manifest.metafiles_in_group(group).each do |metafile|
+        metafile.save_from_cache
+      end
+    end
+  end
 end
 desc 'group SUBCOMMAND ...ARGS', 'Manage syncing a group of files'
 subcommand 'group', Group

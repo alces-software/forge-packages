@@ -66,8 +66,8 @@ module FlightSyncer
       (data[:groups] ||= {})[group.to_sym] = files_union
     end
 
-    def files_in_group(group)
-      Array.wrap((data[:groups] || {})[group.to_sym])
+    def metafiles_in_group(group)
+      files_in_group(group).map { |identifier| get_metafile(identifier) }
     end
 
     def get_metafile(identifier)
@@ -97,6 +97,10 @@ module FlightSyncer
     def read
       return {} unless File.exists? manifest_path
       (YAML.load_file(manifest_path) || {}).deep_symbolize_keys
+    end
+
+    def files_in_group(group)
+      Array.wrap((data[:groups] || {})[group.to_sym])
     end
   end
 end
