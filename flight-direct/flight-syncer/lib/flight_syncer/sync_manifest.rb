@@ -54,7 +54,15 @@ module FlightSyncer
     end
 
     def add_files_to_group(group, *files)
-      files_union = files_in_group(group) | files
+      valid_files = files.select do |file|
+        next true if get_metafile(file)
+        $stderr.puts <<-WARN.squish
+          WARNING: '#{file}' has not been cached, skipping adding it to the
+          group
+        WARN
+        false
+      end
+      files_union = files_in_group(group) | valid_files
       (data[:groups] ||= {})[group.to_sym] = files_union
     end
 
