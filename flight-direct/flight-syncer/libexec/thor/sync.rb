@@ -99,34 +99,24 @@ end
 desc 'list SUBCOMMAND ...ARGS', 'List the files/groups to be synced'
 subcommand 'list', List
 
-# desc 'file IDENTIFIER...', 'Sync a file from the cache'
-# def file(*identifiers)
-#   FlightSyncer::SyncManifest.remote do |manifest|
-#     identifiers.each do |identifier|
-#       if (metafile = manifest.get_metafile(identifier)).nil?
-#         $stderr.puts <<-WARN.strip_heredoc
-#           Warning: Could not locate '#{identifier}' file in sync manifest
-#         WARN
-#       else
-#         metafile.save_from_cache
-#       end
-#     end
-#   end
-# end
-
-# class Group < Thor
-#   # Only show the 'add' command if on the cache server (aka the public dir
-#   # has been defined)
-
-#   desc 'get GROUP', 'Sync all the files within the group'
-#   def get(group)
-#     FlightSyncer::SyncManifest.remote do |manifest|
-#       manifest.metafiles_in_group(group).each do |metafile|
-#         metafile.save_from_cache
-#       end
-#     end
-#   end
-# end
-# desc 'group SUBCOMMAND ...ARGS', 'Manage syncing a group of files'
-# subcommand 'group', Group
+desc 'run-sync', 'Syncs all the files and groups'
+def run_sync
+  FlightSyncer::SyncManifest.remote do |manifest|
+    files = Config.data
+                  .groups
+                  .map { |group| manifest.files_in_group(group) }
+                  .push(Config.data.files)
+                  .flatten
+                  .uniq
+    files.each do |identifier|
+      if (metafile = manifest.get_metafile(identifier)).nil?
+        $stderr.puts <<-WARN.strip_heredoc
+          Warning: Could not locate '#{identifier}' file in sync manifest
+        WARN
+      else
+        metafile.save_from_cache
+      end
+    end
+  end
+end
 
