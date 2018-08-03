@@ -1,7 +1,34 @@
 #: SYNOPSIS: Sync files from the cache
 
 require 'flight_syncer'
-require 'flight_config'
+require 'yaml'
+require 'ostruct'
+require 'hashie'
+
+# Manages the client side configurations
+YAML_File = Struct.new(:path) do
+  def update
+    yield data if block_given?
+    save
+  end
+
+  def data
+    @data ||= Hashie::Mash.new(raw_load)
+  end
+
+  def save
+    File.write(path, YAML.dump(data.to_hash))
+  end
+
+  private
+
+  def raw_load
+    File.exists?(path) ? YAML.load_file(path) : {}
+  end
+end
+Config = YAML_File.new(
+  File.join(ENV['FL_ROOT'], 'var/lib/syncer/client.yaml')
+)
 
 # The cache commands are used to modify the sync manifest on the server
 class Cache < Thor
@@ -37,6 +64,25 @@ if FlightConfig.get('public-dir')
   desc 'cache SUBCOMMAND ...ARGS', 'Manage the sync server cache'
   subcommand 'cache', Cache
 end
+
+class Add < Thor
+  desc 'files IDENTIFIERS...', 'Add files to be synced'
+  def files(*identifiers)
+    Config.update do |data|
+      data.files = (data.files || []) | identifiers
+    end
+  end
+
+  desc 'groups NAMES...', 'Add groups to be synced'
+  def groups(*names)
+    Config.update do |data|
+      data.groups = (data.groups || []) | names
+    end
+  end
+end
+
+desc 'add SUBCOMMAND ...ARGS', 'Add files to be synced'
+subcommand 'add', Add
 
 # desc 'file IDENTIFIER...', 'Sync a file from the cache'
 # def file(*identifiers)
