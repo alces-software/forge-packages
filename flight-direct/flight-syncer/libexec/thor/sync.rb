@@ -102,12 +102,11 @@ subcommand 'list', List
 desc 'run-sync', 'Syncs all the files and groups'
 def run_sync
   FlightSyncer::SyncManifest.remote do |manifest|
-    files = Config.data
-                  .groups
-                  .map { |group| manifest.files_in_group(group) }
-                  .push(Config.data.files)
-                  .flatten
-                  .uniq
+    files = Array.wrap(Config.data.groups)
+                 .map { |group| manifest.files_in_group(group) }
+                 .push(Array.wrap(Config.data.files))
+                 .flatten
+                 .uniq
     files.each do |identifier|
       if (metafile = manifest.get_metafile(identifier)).nil?
         $stderr.puts <<-WARN.strip_heredoc
