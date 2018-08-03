@@ -17,6 +17,7 @@ YAML_File = Struct.new(:path) do
   end
 
   def save
+    FileUtils.mkdir_p File.dirname(path)
     File.write(path, YAML.dump(data.to_hash))
   end
 
@@ -83,6 +84,20 @@ end
 
 desc 'add SUBCOMMAND ...ARGS', 'Add files to be synced'
 subcommand 'add', Add
+
+class List < Thor
+  desc 'files', 'List the files to be synced'
+  def files
+    puts Config.data.files
+  end
+
+  desc 'groups', 'List the groups to be synced'
+  def groups
+    puts Config.data.groups
+  end
+end
+desc 'list SUBCOMMAND ...ARGS', 'List the files/groups to be synced'
+subcommand 'list', List
 
 # desc 'file IDENTIFIER...', 'Sync a file from the cache'
 # def file(*identifiers)
