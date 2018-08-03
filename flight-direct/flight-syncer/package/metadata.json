@@ -2,7 +2,7 @@
   "type": "packages",
   "attributes": {
     "name": "flight-syncer",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "summary": "Sync files into place from the file cache",
     "dependencies": [
     ]
