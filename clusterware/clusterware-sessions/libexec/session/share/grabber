@@ -1,6 +1,6 @@
 #!/bin/bash
 #==============================================================================
-# Copyright (C) 2015 Stephen F. Norledge and Alces Software Ltd.
+# Copyright (C) 2015-2018 Stephen F. Norledge and Alces Software Ltd.
 #
 # This file/package is part of Alces Clusterware.
 #
@@ -66,6 +66,8 @@ main() {
 
 setup
 require action
-require handler
-
-main "$@"
+# The 'handler' function library may not be installed, so we suppress
+# error output here and exit if we don't have it installed.
+if require handler &> /dev/null; then
+    main "$@"
+fi

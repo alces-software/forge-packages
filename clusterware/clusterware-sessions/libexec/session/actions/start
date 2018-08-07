@@ -1,6 +1,6 @@
 #!/bin/bash
 #==============================================================================
-# Copyright (C) 2015 Stephen F. Norledge and Alces Software Ltd.
+# Copyright (C) 2015-2018 Stephen F. Norledge and Alces Software Ltd.
 #
 # This file/package is part of Alces Clusterware.
 #
@@ -30,7 +30,10 @@ require files
 require network
 require service
 require vnc
-require handler
+# The 'handler' function library may not be installed, so we suppress
+# error output here and code around the presence or absence where it's
+# used.
+require handler &> /dev/null
 require process
 require xdg
 
@@ -232,8 +235,12 @@ EOF
         vnc_emit_details "${sessionvars[@]}"
     fi
 
-    handler_run_hook session-start "$_SESSIONID"
-    _start_grabber "${vnc[DISPLAY]}" "$_SESSIONID"
+    if type -t handler_run_hook 2>/dev/null; then
+        handler_run_hook session-start "$_SESSIONID"
+        # We only start the grabber if we have the handler library as
+        # it relies on it.
+        _start_grabber "${vnc[DISPLAY]}" "$_SESSIONID"
+    fi
 
     if [ "${runtime}" -gt 0 ]; then
         _start_timer "${vnc[DISPLAY]}" "${runtime}"
@@ -245,7 +252,9 @@ EOF
     rm -f "${_SESSIONDIR}/starting.txt"
     {
         process_wait_for_pid $(cat "${vnc[PIDFILE]}")
-        handler_run_hook session-end "$_SESSIONID"
+        if type -t handler_run_hook 2>/dev/null; then
+            handler_run_hook session-end "$_SESSIONID"
+        fi
         action_cleanup
     } &>/dev/null &
 
