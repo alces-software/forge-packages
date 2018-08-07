@@ -33,6 +33,8 @@ Config = YAML_File.new(
 
 # The cache commands are used to modify the sync manifest on the server
 class Cache < Thor
+  include Loki::ThorExt
+
   desc 'file PATH', 'Add a file to the local cache'
   METAFILE_PARAMS = {
     path: 'The sync path of the file',
@@ -43,7 +45,7 @@ class Cache < Thor
   }.each do |key, option_desc|
     method_option key, desc: option_desc
   end
-  def file(path)
+  loki_command(:file) do |path|
     content = File.read(path)
     params = options.symbolize_keys.select do |k, _v|
       METAFILE_PARAMS.keys.include?(k)
@@ -53,7 +55,7 @@ class Cache < Thor
   end
 
   desc 'group NAME FILES...', 'Add files to a group'
-  def group(group, *files)
+  loki_command(:group) do |group, *files|
     FlightSyncer::SyncManifest.update do |manifest|
       manifest.add_files_to_group(group, *files)
     end
@@ -68,31 +70,30 @@ end
 
 class Add < Thor
   desc 'files IDENTIFIERS...', 'Add files to be synced'
-  def files(*identifiers)
+  loki_command(:files) do |*identifiers|
     Config.update do |data|
       data.files = (data.files || []) | identifiers
     end
   end
 
   desc 'groups NAMES...', 'Add groups to be synced'
-  def groups(*names)
+  loki_command(:groups) do |*names|
     Config.update do |data|
       data.groups = (data.groups || []) | names
     end
   end
 end
-
 desc 'add SUBCOMMAND ...ARGS', 'Add files to be synced'
 subcommand 'add', Add
 
 class List < Thor
   desc 'files', 'List the files to be synced'
-  def files
+  loki_command(:files) do
     puts Config.data.files
   end
 
   desc 'groups', 'List the groups to be synced'
-  def groups
+  loki_command(:groups) do
     puts Config.data.groups
   end
 end
@@ -100,7 +101,7 @@ desc 'list SUBCOMMAND ...ARGS', 'List the files/groups to be synced'
 subcommand 'list', List
 
 desc 'run-sync', 'Syncs all the files and groups'
-def run_sync
+loki_command(:run_sync) do
   FlightSyncer::SyncManifest.remote do |manifest|
     files = Array.wrap(Config.data.groups)
                  .map { |group| manifest.files_in_group(group) }
