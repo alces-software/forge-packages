@@ -15,7 +15,7 @@ else
     tar -C "${cw_ROOT}"/var/lib/storage/repos/base -xzf /tmp/clusterware-storage.tar.gz
   else
     require files
-    files_load_config serviceware
+    files_load_config --optional serviceware
     export cw_STORAGE_rev cw_STORAGE_track
     "${cw_ROOT}/bin/alces" storage update
   fi
