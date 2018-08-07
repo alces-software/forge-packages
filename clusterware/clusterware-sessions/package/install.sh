@@ -13,6 +13,8 @@ else
     mkdir -p "${cw_ROOT}"/var/lib/sessions/repos/base
     tar -C "${cw_ROOT}"/var/lib/sessions/repos/base -xzf /tmp/clusterware-sessions.tar.gz
   else
+    require files
+    files_load_config --optional serviceware
     export cw_SESSION_rev cw_SESSION_track
     "${cw_ROOT}/bin/alces" session update
     "${cw_ROOT}/bin/alces" session enable default
