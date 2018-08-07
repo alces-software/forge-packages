@@ -264,8 +264,9 @@ storage_set_default_configuration() {
 storage_broadcast_enabled() {
     files_load_config --optional instance config/cluster
     if [ "${cw_INSTANCE_role}" == "master" ]; then
-        require handler
-        handler_broadcast --quiet storage-enabled $(ls -1 "${cw_STORAGE_PLUGINDIR}")
+        if require handler &> /dev/null; then
+            handler_broadcast --quiet storage-enabled $(ls -1 "${cw_STORAGE_PLUGINDIR}")
+        fi
     fi
 }
 
