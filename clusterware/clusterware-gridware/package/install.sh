@@ -21,6 +21,18 @@ chmod -R g+rw "${access_targets[@]}"
 find "${access_targets[@]}" -type d -exec chmod 2775 {} \;
 chgrp -R gridware "${access_targets[@]}"
 
+# Tries to download the tarball from the cache server
+if [ -n "$FL_CONFIG_CACHE_URL" ]; then
+  main="${FL_CONFIG_CACHE_URL}/git/gridware-packages-main.tar.gz"
+  volatile="${FL_CONFIG_CACHE_URL}/git/gridware-packages-volatile.tar.gz"
+  depot="${FL_CONFIG_CACHE_URL}/git/gridware-depots.tar.gz"
+  pushd /tmp >/dev/null
+    wget $main 2>/dev/null
+    wget $volatile 2>/dev/null
+    wget $depot 2>/dev/null
+  popd >/dev/null
+fi
+
 echo "Setting up default gridware package repositories"
 if [ ! -d "${cw_ROOT}/var/lib/gridware/repos" ]; then
   if [ ! -f "${cw_ROOT}"/var/lib/gridware/repos/main/repo.yml ]; then
@@ -30,16 +42,6 @@ if [ ! -d "${cw_ROOT}/var/lib/gridware/repos" ]; then
   if [ ! -f "${cw_ROOT}"/var/lib/gridware/repos/volatile/repo.yml ]; then
     mkdir -p "${cw_ROOT}"/var/lib/gridware/repos/volatile
     cp data/dist/repos/volatile/repo.yml "${cw_ROOT}"/var/lib/gridware/repos/volatile/repo.yml
-  fi
-
-  # Tries to download the tarball from the cache server
-  if [ -n "$FL_CONFIG_CACHE_URL" ]; then
-    main="${FL_CONFIG_CACHE_URL}/git/gridware-packages-main.tar.gz"
-    volatile="${FL_CONFIG_CACHE_URL}/git/gridware-packages-volatile.tar.gz"
-    pushd /tmp >/dev/null
-      wget $main 2>/dev/null
-      wget $volatile 2>/dev/null
-    popd >/dev/null
   fi
 
   if [ -f "/tmp/gridware-packages-main.tar.gz" ]; then
