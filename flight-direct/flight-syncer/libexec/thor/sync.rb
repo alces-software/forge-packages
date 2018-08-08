@@ -1,4 +1,5 @@
 #: SYNOPSIS: Sync files from the cache
+#: ROOT: true
 
 require 'flight_syncer'
 require 'yaml'
