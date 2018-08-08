@@ -114,7 +114,14 @@ loki_command(:run_sync) do
           Warning: Could not locate '#{identifier}' file in sync manifest
         WARN
       else
-        metafile.save_from_cache
+        begin
+          metafile.save_from_cache
+        rescue => e
+          $stderr.puts <<-WARN.strip_heredoc
+            Warning: Failed to sync '#{identifier}'
+            Error: #{e.message}
+          WARN
+        end
       end
     end
   end
