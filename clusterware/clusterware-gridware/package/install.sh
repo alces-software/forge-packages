@@ -74,14 +74,19 @@ if [ ! -d "${cw_ROOT}/var/lib/gridware/depots" ]; then
     cp data/dist/depots/official/repo.yml "${cw_ROOT}"/var/lib/gridware/depots/official/repo.yml
   fi
 
-  cat <<EOF > "${cw_ROOT}"/etc/gridware.yml
+  if [ -f '/tmp/gridware-depots.tar.gz' ]; then
+    mkdir -p "${cw_ROOT}"/var/lib/gridware/depots/official/data
+    tar -C "${cw_ROOT}"/var/lib/gridware/depots/official/data -xzvf /tmp/gridware-depots.tar.gz
+  else
+    cat <<EOF > "${cw_ROOT}"/etc/gridware.yml
 :last_update_filename: .last_update
 :log_root: /var/log/gridware
 :depot_repo_paths:
   - ${cw_ROOT}/var/lib/gridware/depots/official
 EOF
-  "${cw_ROOT}/bin/alces" gridware depot update official 2>&1
-  rm -f "${cw_ROOT}"/etc/gridware.yml
+    "${cw_ROOT}/bin/alces" gridware depot update official 2>&1
+    rm -f "${cw_ROOT}"/etc/gridware.yml
+  fi
 
   chmod -R g+rw "${cw_ROOT}"/var/lib/gridware/depots/official/data
   find "${cw_ROOT}"/var/lib/gridware/depots/official/data -type d -exec chmod 2775 {} \;
