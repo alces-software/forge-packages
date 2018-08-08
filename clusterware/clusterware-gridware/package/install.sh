@@ -34,9 +34,11 @@ if [ ! -d "${cw_ROOT}/var/lib/gridware/repos" ]; then
 
   # Tries to download the tarball from the cache server
   if [ -n "$FL_CONFIG_CACHE_URL" ]; then
-    url="${FL_CONFIG_CACHE_URL}/git/gridware-packages-main.tar.gz"
+    main="${FL_CONFIG_CACHE_URL}/git/gridware-packages-main.tar.gz"
+    volatile="${FL_CONFIG_CACHE_URL}/git/gridware-packages-volatile.tar.gz"
     pushd /tmp >/dev/null
-      wget $url 2>/dev/null
+      wget $main 2>/dev/null
+      wget $volatile 2>/dev/null
     popd >/dev/null
   fi
 
