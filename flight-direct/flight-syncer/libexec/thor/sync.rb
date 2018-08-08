@@ -70,6 +70,8 @@ if FlightConfig.get('public-dir')
 end
 
 class Add < Thor
+  include Loki::ThorExt
+
   desc 'files IDENTIFIERS...', 'Add files to be synced'
   loki_command(:files) do |*identifiers|
     Config.update do |data|
@@ -88,6 +90,8 @@ desc 'add SUBCOMMAND ...ARGS', 'Add files to be synced'
 subcommand 'add', Add
 
 class List < Thor
+  include Loki::ThorExt
+
   desc 'files', 'List the files to be synced'
   loki_command(:files) do
     puts Config.data.files
