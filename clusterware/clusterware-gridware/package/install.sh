@@ -32,6 +32,14 @@ if [ ! -d "${cw_ROOT}/var/lib/gridware/repos" ]; then
     cp data/dist/repos/volatile/repo.yml "${cw_ROOT}"/var/lib/gridware/repos/volatile/repo.yml
   fi
 
+  # Tries to download the tarball from the cache server
+  if [ -n "$FL_CONFIG_CACHE_URL" ]; then
+    url="${FL_CONFIG_CACHE_URL}/git/gridware-packages-main.tar.gz"
+    pushd /tmp >/dev/null
+      wget $url 2>/dev/null
+    popd >/dev/null
+  fi
+
   if [ -f "/tmp/gridware-packages-main.tar.gz" ]; then
     mkdir -p "${cw_ROOT}"/var/lib/gridware/repos/main
     tar -C "${cw_ROOT}"/var/lib/gridware/repos/main -xzf /tmp/gridware-packages-main.tar.gz
