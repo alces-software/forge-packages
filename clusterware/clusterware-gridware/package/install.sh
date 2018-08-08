@@ -21,6 +21,18 @@ chmod -R g+rw "${access_targets[@]}"
 find "${access_targets[@]}" -type d -exec chmod 2775 {} \;
 chgrp -R gridware "${access_targets[@]}"
 
+# Tries to download the tarball from the cache server
+if [ -n "$FL_CONFIG_CACHE_URL" ]; then
+  main="${FL_CONFIG_CACHE_URL}/git/gridware-packages-main.tar.gz"
+  volatile="${FL_CONFIG_CACHE_URL}/git/gridware-packages-volatile.tar.gz"
+  depot="${FL_CONFIG_CACHE_URL}/git/gridware-depots.tar.gz"
+  pushd /tmp >/dev/null
+    wget $main 2>/dev/null
+    wget $volatile 2>/dev/null
+    wget $depot 2>/dev/null
+  popd >/dev/null
+fi
+
 echo "Setting up default gridware package repositories"
 if [ ! -d "${cw_ROOT}/var/lib/gridware/repos" ]; then
   if [ ! -f "${cw_ROOT}"/var/lib/gridware/repos/main/repo.yml ]; then
@@ -62,14 +74,19 @@ if [ ! -d "${cw_ROOT}/var/lib/gridware/depots" ]; then
     cp data/dist/depots/official/repo.yml "${cw_ROOT}"/var/lib/gridware/depots/official/repo.yml
   fi
 
-  cat <<EOF > "${cw_ROOT}"/etc/gridware.yml
+  if [ -f '/tmp/gridware-depots.tar.gz' ]; then
+    mkdir -p "${cw_ROOT}"/var/lib/gridware/depots/official/data
+    tar -C "${cw_ROOT}"/var/lib/gridware/depots/official/data -xzvf /tmp/gridware-depots.tar.gz
+  else
+    cat <<EOF > "${cw_ROOT}"/etc/gridware.yml
 :last_update_filename: .last_update
 :log_root: /var/log/gridware
 :depot_repo_paths:
   - ${cw_ROOT}/var/lib/gridware/depots/official
 EOF
-  "${cw_ROOT}/bin/alces" gridware depot update official 2>&1
-  rm -f "${cw_ROOT}"/etc/gridware.yml
+    "${cw_ROOT}/bin/alces" gridware depot update official 2>&1
+    rm -f "${cw_ROOT}"/etc/gridware.yml
+  fi
 
   chmod -R g+rw "${cw_ROOT}"/var/lib/gridware/depots/official/data
   find "${cw_ROOT}"/var/lib/gridware/depots/official/data -type d -exec chmod 2775 {} \;

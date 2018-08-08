@@ -4,6 +4,14 @@ cp -R data/* "${cw_ROOT}"
 
 mkdir -p "${cw_ROOT}"/opt/clusterware-sessions
 
+# Tries to download the tarball from the cache server
+if [ -n "$FL_CONFIG_CACHE_URL" ]; then
+  url="${FL_CONFIG_CACHE_URL}/git/clusterware-sessions.tar.gz"
+  pushd /tmp >/dev/null
+    wget $url 2>/dev/null
+  popd >/dev/null
+fi
+
 echo "Setting up session base repository"
 if [ -d "${cw_ROOT}/var/lib/sessions/repos" ]; then
   echo 'Detected existing repository.'

@@ -1,4 +1,5 @@
 #: SYNOPSIS: Sync files from the cache
+#: ROOT: true
 
 require 'flight_syncer'
 require 'yaml'
@@ -69,6 +70,8 @@ if FlightConfig.get('public-dir')
 end
 
 class Add < Thor
+  include Loki::ThorExt
+
   desc 'files IDENTIFIERS...', 'Add files to be synced'
   loki_command(:files) do |*identifiers|
     Config.update do |data|
@@ -87,6 +90,8 @@ desc 'add SUBCOMMAND ...ARGS', 'Add files to be synced'
 subcommand 'add', Add
 
 class List < Thor
+  include Loki::ThorExt
+
   desc 'files', 'List the files to be synced'
   loki_command(:files) do
     puts Config.data.files
@@ -114,7 +119,14 @@ loki_command(:run_sync) do
           Warning: Could not locate '#{identifier}' file in sync manifest
         WARN
       else
-        metafile.save_from_cache
+        begin
+          metafile.save_from_cache
+        rescue => e
+          $stderr.puts <<-WARN.strip_heredoc
+            Warning: Failed to sync '#{identifier}'
+            Error: #{e.message}
+          WARN
+        end
       end
     end
   end

@@ -2,7 +2,7 @@
   "type": "packages",
   "attributes": {
     "name": "clusterware-gridware",
-    "version": "2.0.0-dev",
+    "version": "2.1.0-dev",
     "summary": "Alces Gridware integration for Clusterware",
     "username": "alces",
     "dependencies": [

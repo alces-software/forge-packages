@@ -50,10 +50,16 @@ module FlightSyncer
 
     def save_from_cache
       io = URI.parse(url).open
+      FileUtils.mkdir_p File.dirname(sync_path)
       File.open(sync_path, 'w') do |file|
-        file.write(io.read)
-        file.chown(uid, gid)
-        file.chmod(mode.to_i(8))
+        begin
+          file.chown(uid, gid)
+          file.chmod(mode.to_i(8))
+          file.write(io.read)
+        rescue => e
+          FileUtils.rm_f file.path
+          raise e
+        end
       end
     end
 

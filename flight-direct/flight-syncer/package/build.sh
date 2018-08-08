@@ -18,7 +18,7 @@ bundle install --standalone --path vendor/flight-syncer
 popd > /dev/null
 
 rm -rf ../vendor/flight-syncer/cache
-cp -pr ../.bundle ../libexec ../lib ../vendor "${temp_dir}/data"
+cp -pr ../.bundle ../etc ../libexec ../lib ../vendor "${temp_dir}/data"
 
 pushd "${temp_dir}" > /dev/null
 zip -r ${package_name}.zip *
