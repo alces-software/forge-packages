@@ -1,5 +1,7 @@
 #!/bin/bash
 
+yum install -y -e0 wget
+
 cp -R data/* "${cw_ROOT}"
 
 rm -f "${cw_ROOT}"/etc/storage/.gitkeep
@@ -9,7 +11,7 @@ mkdir -p "${cw_ROOT}"/opt/clusterware-storage
 if [ -n "$FL_CONFIG_CACHE_URL" ]; then
   url="${FL_CONFIG_CACHE_URL}/git/clusterware-storage.tar.gz"
   pushd /tmp >/dev/null
-    wget $url 2>/dev/null
+    wget $url
   popd >/dev/null
 fi
 
