@@ -97,3 +97,5 @@ echo "Installing container data files"
 if [ ! -d "${cw_ROOT}/var/lib/gridware/docker" ]; then
   cp -R data/docker "${cw_ROOT}"/var/lib/gridware
 fi
+
+alces gridware init
