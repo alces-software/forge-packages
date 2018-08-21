@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 package_name='clusterware-dropbox-cli'
 
 if [ -f ./${package_name}.zip ]; then
@@ -19,7 +21,7 @@ curl -L "https://github.com/alces-software/clusterware-dropbox-cli/archive/maste
 unzip /tmp/dropbox-cli.zip
 mv clusterware-dropbox-cli-master clusterware-dropbox-cli
 cd clusterware-dropbox-cli
-/opt/clusterware/opt/ruby/bin/bundle install --without="development test" --path=vendor
+bundle install --without="development test" --path=vendor
 
 cat <<EOF > .env
 #==============================================================================
