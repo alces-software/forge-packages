@@ -28,3 +28,8 @@ else
     "${cw_ROOT}/bin/alces" session enable default
   fi
 fi
+
+# Creates the lock file
+mkdir -p "$cw_ROOT"/var/lock
+touch "$cw_ROOT"/var/lock/clusterware.session.lock
+chmod 0644 "$cw_ROOT"/var/lock/clusterware.session.lock
