@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Installs wget
+yum install wget
+
 cp -R data/* "${cw_ROOT}"
 
 mkdir -p "${cw_ROOT}"/opt/clusterware-sessions
@@ -8,7 +11,7 @@ mkdir -p "${cw_ROOT}"/opt/clusterware-sessions
 if [ -n "$FL_CONFIG_CACHE_URL" ]; then
   url="${FL_CONFIG_CACHE_URL}/git/clusterware-sessions.tar.gz"
   pushd /tmp >/dev/null
-    wget $url 2>/dev/null
+    wget $url
   popd >/dev/null
 fi
 
