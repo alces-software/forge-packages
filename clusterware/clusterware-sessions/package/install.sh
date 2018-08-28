@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Installs wget
-yum install wget
+yum -y -e0 install wget
 
 cp -R data/* "${cw_ROOT}"
 
