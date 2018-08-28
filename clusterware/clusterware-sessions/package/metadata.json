@@ -7,7 +7,8 @@
     "dependencies": [
       "alces/tigervnc",
       "alces/websockify",
-      "alces/xwd"
+      "alces/xwd",
+      "alces/pluginhook"
     ]
   }
 }
