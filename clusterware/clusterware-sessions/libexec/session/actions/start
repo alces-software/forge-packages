@@ -235,7 +235,7 @@ EOF
         vnc_emit_details "${sessionvars[@]}"
     fi
 
-    if type -t handler_run_hook 2>/dev/null; then
+    if type -t handler_run_hook >/dev/null 2>&1; then
         handler_run_hook session-start "$_SESSIONID"
         # We only start the grabber if we have the handler library as
         # it relies on it.
@@ -252,7 +252,7 @@ EOF
     rm -f "${_SESSIONDIR}/starting.txt"
     {
         process_wait_for_pid $(cat "${vnc[PIDFILE]}")
-        if type -t handler_run_hook 2>/dev/null; then
+        if type -t handler_run_hook >/dev/null 2>&1; then
             handler_run_hook session-end "$_SESSIONID"
         fi
         action_cleanup
