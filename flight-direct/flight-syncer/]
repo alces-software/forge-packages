@@ -52,7 +52,25 @@ class Cache < Thor
     the base filename if missing.
 
     The following flags are also optional. They will be inferred from the
-    source file if missing: --path, --mode, --owner, --group
+    source file if missing:
+
+    --path
+      The file path to be synced
+      The client will automatically create the directories
+
+    --mode
+      Sets the file permissions
+      This must be given as an octal number
+
+    --owner
+      Sets the files owner
+      The owner must exist on the client machine in advance. It does not
+      have to exist on the anvil server
+
+    --group
+      Sets the files group
+      The group must exist on the client machine in advance. It does not
+      have to exist on the anvil server
   LONGDESC
   loki_command(:file) do |path|
     content = File.read(path)
