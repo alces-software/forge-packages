@@ -88,6 +88,12 @@ class Add < Thor
   include Loki::ThorExt
 
   desc 'files IDENTIFIERS...', 'Add files to be synced'
+  long_desc <<-LONGDESC
+    The `sync add files` command will add a list of files to be synced. The
+    file identifiers need to match what is stored on the anvil server. This
+    command does not trigger the sync nor check if the files exist on the
+    server.
+  LONGDESC
   loki_command(:files) do |*identifiers|
     Config.update do |data|
       data.files = (data.files || []) | identifiers
