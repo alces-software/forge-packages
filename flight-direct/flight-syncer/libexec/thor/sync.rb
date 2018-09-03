@@ -64,6 +64,13 @@ class Cache < Thor
   end
 
   desc 'group NAME FILES...', 'Add files to a group'
+  long_desc <<-LONGDESC
+    The `sync cache group` command allows for multiple files to be synced as
+    a group. The command adds existing files (by identifier) to the group.
+
+    The command will not delete files, so it is safe run the command multiple
+    times with the same group
+  LONGDESC
   loki_command(:group) do |group, *files|
     FlightSyncer::SyncManifest.update do |manifest|
       manifest.add_files_to_group(group, *files)
