@@ -89,7 +89,7 @@ class Add < Thor
 
   desc 'files IDENTIFIERS...', 'Add files to be synced'
   long_desc <<-LONGDESC
-    The `sync add files` command will add a list of files to be synced. The
+    The `sync add files` command adds a list of files to be synced. The
     file identifiers need to match what is stored on the anvil server. This
     command does not trigger the sync nor check if the files exist on the
     server.
@@ -101,6 +101,10 @@ class Add < Thor
   end
 
   desc 'groups NAMES...', 'Add groups to be synced'
+  long_desc <<-LONGDESC
+    The `sync add groups` command adds a list of groups to be synced. This
+    does not trigger a sync nor does it check if the group exists.
+  LONGDESC
   loki_command(:groups) do |*names|
     Config.update do |data|
       data.groups = (data.groups || []) | names
