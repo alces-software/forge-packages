@@ -131,6 +131,10 @@ desc 'list SUBCOMMAND ...ARGS', 'List the files/groups to be synced'
 subcommand 'list', List
 
 desc 'run-sync', 'Syncs all the files and groups'
+long_desc <<-LONGDESC
+  Manually triggers the files and groups to be synced. This command is
+  otherwise called on reboot
+LONGDESC
 loki_command(:run_sync) do
   FlightSyncer::SyncManifest.remote do |manifest|
     files = Array.wrap(Config.data.groups)
