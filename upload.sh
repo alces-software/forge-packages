@@ -10,10 +10,11 @@ if [ -z "$FLIGHT_SSO_TOKEN" ]; then
   exit 2
 fi
 
+domain=${FL_CONFIG_CACHE_URL:-https://forge-api.alces-flight.com}
+
 curl --silent --show-error --fail \
 	-H "Authorization: Bearer $FLIGHT_SSO_TOKEN" \
-       	-F package=@"$1" \
-        https://forge-api.alces-flight.com/v1/upload
+       	-F package=@"$1" $domain/v1/upload
 
 if [ $? -eq 0 ]; then
   echo 'OK'
