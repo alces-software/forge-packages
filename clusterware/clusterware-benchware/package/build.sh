@@ -13,12 +13,11 @@ temp_dir=$(mktemp -d /tmp/${package_name}-build-XXXXX)
 
 cp -r * "${temp_dir}"
 
-git clone -b ${VERSION} https://github.com/alces-software/benchware "${temp_dir}/data"
-cp -r ../.bundle "${temp_dir}/data"
+git clone -b ${VERSION} https://github.com/alces-software/benchware "${temp_dir}/data/opt/benchware"
+cp -pr ../libexec "${temp_dir}/data"
 
-pushd "${temp_dir}/data" > /dev/null
-  rm -rf vendor
-  bundle install --standalone --path vendor/clusterware-benchware
+pushd "${temp_dir}/data/opt/benchware" > /dev/null
+  bundle install 
 popd > /dev/null
 
 pushd "${temp_dir}" > /dev/null
