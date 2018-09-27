@@ -17,7 +17,7 @@ git clone -b ${VERSION} https://github.com/alces-software/benchware "${temp_dir}
 cp -pr ../libexec "${temp_dir}/data"
 
 pushd "${temp_dir}/data/opt/benchware" > /dev/null
-  bundle install 
+  bundle install --path=vendor
 popd > /dev/null
 
 pushd "${temp_dir}" > /dev/null

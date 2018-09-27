@@ -10,10 +10,11 @@ cw_BINNAME="${cw_BINNAME} $(basename "$0")"
  
 case $action in
   h|he|hel|help|--help)
-    exec ruby ${cw_ROOT}/opt/benchware/benchware.rb --help
+    cd ${cw_ROOT}/opt/benchware/
+    exec bundle exec benchware.rb --help
     ;;
   *)
     cd ${cw_ROOT}/opt/benchware/
-    exec ruby benchware.rb $@
+    exec bundle exec benchware.rb $@
     ;;
 esac
