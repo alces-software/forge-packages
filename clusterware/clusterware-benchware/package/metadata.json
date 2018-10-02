@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "clusterware-benchware",
+    "version": "2018.1.0",
+    "summary": "Benchware cluster reporting tool",
+    "dependencies": [
+      "alces/pdsh"
+    ]
+  }
+}

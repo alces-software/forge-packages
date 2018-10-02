@@ -1,0 +1,20 @@
+: '
+: NAME: benchware
+: SYNOPSIS: Benchware cluster reporting tool
+: VERSION: 2018.1.0
+: '
+
+# Setup CLI args
+action=$1
+cw_BINNAME="${cw_BINNAME} $(basename "$0")"
+ 
+case $action in
+  h|he|hel|help|--help)
+    cd ${cw_ROOT}/opt/benchware/
+    exec bundle exec benchware.rb --help
+    ;;
+  *)
+    cd ${cw_ROOT}/opt/benchware/
+    exec bundle exec benchware.rb $@
+    ;;
+esac
