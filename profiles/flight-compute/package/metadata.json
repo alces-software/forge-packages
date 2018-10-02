@@ -1,0 +1,13 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "flight-compute",
+    "version": "2018.1.0",
+    "summary": "Meta package to install compute profile tools",
+    "dependencies": [
+        "alces/flight-syncer",
+        "alces/flight-completion",
+        "alces/clusterware-gridware"
+    ]
+  }
+}

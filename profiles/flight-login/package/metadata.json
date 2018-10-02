@@ -1,0 +1,14 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "flight-login",
+    "version": "2018.1.0",
+    "summary": "Meta package to install login profile tools",
+    "dependencies": [
+        "alces/flight-compute",
+        "alces/clusterware-docs",
+        "alces/clusterware-storage",
+        "alces/clusterware-ssh"
+    ]
+  }
+}
