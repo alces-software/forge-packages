@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cw_ROOT=${cw_ROOT:-/opt/clusterware}
+FL_ROOT=${FL_ROOT:-/opt/flight}
 package_name='genders'
 
 if [ -f ./${package_name}.zip ]; then
@@ -19,10 +19,10 @@ cp -pr ../etc "${temp_dir}/data"
 
 curl -L "https://github.com/chaos/genders/releases/download/genders-1-22-1/genders-1.22.tar.gz" -o /tmp/genders-source.tar.gz
 tar -C /tmp -xzf "/tmp/genders-source.tar.gz"
-mkdir -p "${cw_ROOT}"/opt/genders
+mkdir -p "${FL_ROOT}"/opt/genders
 pushd /tmp/genders-*
-./configure --prefix="${cw_ROOT}/opt/genders" \
-  --with-genders-file="/opt/clusterware/etc/genders" \
+./configure --prefix="${FL_ROOT}/opt/genders" \
+  --with-genders-file="${FL_ROOT}/etc/genders" \
   --without-java-extensions \
   --without-perl-extensions \
   --without-python-extensions
@@ -37,7 +37,7 @@ popd
 
 pushd "${temp_dir}" > /dev/null
 mkdir -p "${temp_dir}/data/opt"
-cp -R "${cw_ROOT}/opt/genders" "${temp_dir}/data/opt"
+cp -R "${FL_ROOT}/opt/genders" "${temp_dir}/data/opt"
 zip -r ${package_name}.zip *
 popd > /dev/null
 
