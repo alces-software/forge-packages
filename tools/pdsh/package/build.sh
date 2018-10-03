@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FL_ROOT=${FL_ROOT:-/opt/flight}
+FL_ROOT=${FL_ROOT:-/opt/flight-direct}
 if [ ! -d "${FL_ROOT}"/opt/genders ]; then
     echo "Genders must be installed to compile this package."
     exit 1

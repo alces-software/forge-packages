@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FL_ROOT=${FL_ROOT:-/opt/flight}
+FL_ROOT=${FL_ROOT:-/opt/flight-direct}
 package_name='genders'
 
 if [ -f ./${package_name}.zip ]; then
