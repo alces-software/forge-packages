@@ -19,7 +19,14 @@ mkdir -p "${temp_dir}/data"
 
 cp -pr ../etc "${temp_dir}/data"
 
-curl -L "https://github.com/chaos/genders/releases/download/genders-1-22-1/genders-1.22.tar.gz" -o /tmp/genders-source.tar.gz
+# Set the version number so the build file names are known in advance
+major_version='1'
+minor_version='22'
+patch_version='1'
+tag="${major_version}-${minor_version}-${patch_version}"
+version="${major_version}.${minor_version}"
+
+curl -L "https://github.com/chaos/genders/releases/download/genders-$tag/genders-${version}.tar.gz" -o /tmp/genders-source.tar.gz
 tar -C /tmp -xzf "/tmp/genders-source.tar.gz"
 mkdir -p "${FL_ROOT}"/opt/genders
 pushd /tmp/genders-*
