@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 FL_ROOT=${FL_ROOT:-/opt/flight-direct}
 package_name='genders'
 
