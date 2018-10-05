@@ -37,7 +37,7 @@ pushd /tmp/genders-*
   --without-python-extensions
 popd
 
-patch -d /tmp/genders-* -p0 < ../genders-file-envvar.patch
+patch -d /tmp/genders-$version -p0 < ../genders-file-envvar.patch
 
 pushd /tmp/genders-*
 make
