@@ -10,6 +10,7 @@ fi
 temp_dir=$(mktemp -d /tmp/${package_name}-build-XXXXX)
 
 cp -r * "${temp_dir}"
+cp -r ../data/* "${temp_dir}"
 
 pushd "${temp_dir}" > /dev/null
 zip -r ${package_name}.zip *

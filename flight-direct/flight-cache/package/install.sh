@@ -7,7 +7,7 @@ yum -y -e0 install gcc
 
 # Installs postgres if it is missing
 if ! which postgres 2>&1 >/dev/null; then
-  $scripts_dir/setup-postgres.sh
+  ./setup-postgres.sh
 fi
 
 # Ensures the profile has been sourced
