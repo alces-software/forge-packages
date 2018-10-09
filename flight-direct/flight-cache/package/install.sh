@@ -43,3 +43,8 @@ SYSTEMD
 
 # Applies the systemd change
 systemctl daemon-reload
+
+# Sets the node to build off its local cache
+# This means all future packages will be installed from the cache
+echo "FL_CONFIG_CACHE_URL=http://localhost" >> $FL_ROOT/var/flight.conf
+
