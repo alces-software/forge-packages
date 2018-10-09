@@ -15,6 +15,6 @@ case $action in
     ;;
   *)
     cd ${cw_ROOT}/opt/benchware/
-    exec bundle exec benchware.rb $@
+    exec bundle exec benchware.rb "$@"
     ;;
 esac
