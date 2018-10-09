@@ -99,3 +99,4 @@ if [ ! -d "${cw_ROOT}/var/lib/gridware/docker" ]; then
 fi
 
 alces gridware init
+alces gridware depot enable local
