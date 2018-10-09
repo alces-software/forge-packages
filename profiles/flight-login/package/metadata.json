@@ -7,7 +7,6 @@
     "dependencies": [
         "alces/flight-compute",
         "alces/clusterware-docs",
-        "alces/clusterware-storage",
         "alces/clusterware-ssh"
     ]
   }

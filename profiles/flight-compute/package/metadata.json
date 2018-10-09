@@ -7,7 +7,9 @@
     "dependencies": [
         "alces/flight-syncer",
         "alces/flight-completion",
-        "alces/clusterware-gridware"
+        "alces/clusterware-gridware",
+        "alces/clusterware-storage",
+        "alces/pdsh"
     ]
   }
 }
