@@ -2,6 +2,9 @@
 
 scripts_dir=$FL_ROOT/opt/anvil/scripts
 
+# Moves the directories in place
+cp -r ./fl_root/* $FL_ROOT
+
 # Installs the required packages
 yum -y -e0 install gcc
 

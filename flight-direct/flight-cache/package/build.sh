@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 package_name='flight-cache'
 
 if [ -f ./${package_name}.zip ]; then
