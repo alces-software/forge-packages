@@ -9,5 +9,10 @@ LONGDESC
 loki_command(:snapshot) do |address|
   # Set the `BASE_URL` of the snapshot
   ENV['ANVIL_BASE_URL'] = "http://#{address}"
-  exec("cd #{FlightDirect.root_dir}/opt/anvil && rake packages:snapshot")
+  exec(<<~EOF
+cd #{FlightDirect.root_dir}/opt/anvil && \
+rake packages:snapshot && \
+systemctl enable anvil
+EOF
+)
 end
