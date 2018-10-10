@@ -1,0 +1,11 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "flight-cache",
+    "version": "0.0.1",
+    "summary": "Sets up this machine as the flight-cache",
+    "dependencies": [
+      "alces/anvil"
+    ]
+  }
+}
