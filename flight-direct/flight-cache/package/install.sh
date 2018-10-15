@@ -16,12 +16,6 @@ fi
 # Ensures the profile has been sourced
 source ~/.bashrc
 
-# Sets the rails environment to be snapshot
-if ! [[ -z "RAILS_ENV" ]]; then
-  echo "export RAILS_ENV=snapshot" >> ~/.bashrc
-  source ~/.bashrc
-fi
-
 # Installs the gems
 cd $scripts_dir/..
 bundle install --without development --with default snapshot
