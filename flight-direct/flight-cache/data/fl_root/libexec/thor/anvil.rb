@@ -18,10 +18,3 @@ EOF
 )
 end
 
-['start', 'status', 'stop', 'restart'].each do |task|
-  capital = task.split('')
-                .tap { |chars| chars[0] = chars[0].upcase }
-                .join('')
-  desc task, "#{capital} the cache server"
-  loki_command(task.to_sym) { exec("systemctl #{task} anvil") }
-end
