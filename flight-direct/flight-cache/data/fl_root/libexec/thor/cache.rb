@@ -40,6 +40,26 @@ class Snapshot < Thor::Group
     download(flight_direct_url, fd_path)
   end
 
+  def download_git_repos
+    ['clusterware-sessions', 'clusterware-storage',
+     'gridware-packages-main', 'packager-base', 'gridware-depots'
+    ].each do |repo|
+      url = "https://github.com/alces-software/#{repo}.git"
+      source = "/tmp/repos/#{repo}"
+      target = File.join(ENV['ANVIL_LOCAL_DIR'], 'git', "#{repo}.tar.gz")
+      print `rm -rf #{source} #{target}`
+      print `mkdir -p #{File.dirname(target)}`
+      puts `git clone #{url} #{source}`
+      puts `tar --warning=no-file-changed -C #{source} -czf #{target} .`
+    end
+    # Renames packager-base to be the volatile repo
+    prefix = File.join(ENV['ANVIL_LOCAL_DIR'], 'git')
+    packager_src = File.expand_path('packager-base.tar.gz', prefix)
+    packager_dst = File.expand_path('gridware-packages-volatile.tar.gz',
+                                    prefix)
+    FileUtils.mv packager_src, packager_dst
+  end
+
   def database_setup
     run_rake('db:setup')
   end
