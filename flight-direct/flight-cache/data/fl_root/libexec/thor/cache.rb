@@ -20,7 +20,6 @@ class Snapshot < Thor::Group
 
   def download_flight_direct_bootstrap_script
     puts 'Downloading FlightDirect bootstrap'
-    bootstrap_url = 'https://raw.githubusercontent.com/alces-software/flight-direct/master/scripts/bootstrap.sh'
     bootstrap_path = File.join(ENV['ANVIL_LOCAL_DIR'],
                                'flight-direct',
                                'bootstrap.sh')
@@ -53,6 +52,10 @@ class Snapshot < Thor::Group
   end
 
   private
+
+  def bootstrap_url
+    'https://raw.githubusercontent.com/alces-software/flight-direct/master/scripts/bootstrap.sh'
+  end
 
   def download(url, path)
     FileUtils.mkdir_p File.dirname(path)
