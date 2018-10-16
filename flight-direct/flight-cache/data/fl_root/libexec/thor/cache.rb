@@ -6,9 +6,19 @@ require 'thor/group'
 require 'open-uri'
 
 class Snapshot < Thor::Group
+  argument :address, type: :string
+
   # NOTE: The following methods are ran in the order they have been defined
   # Some of the tasks are order dependent (e.g. download/import)
-  def download_flight_direct_bootstrap
+  def setup
+    ENV['RAILS_ENV'] = 'snapshot'
+    ENV['ANVIL_BASE_URL'] = "http://#{address}"
+    ENV['ANVIL_UPSTREAM'] = 'https://forge-api.alces-flight.com'
+    ENV['ANVIL_LOCAL_DIR'] = File.expand_path('opt/anvil/public',
+                                              FlightDirect.root_dir)
+  end
+
+  def download_flight_direct_bootstrap_script
     puts 'Downloading FlightDirect bootstrap'
     bootstrap_url = 'https://raw.githubusercontent.com/alces-software/flight-direct/master/scripts/bootstrap.sh'
     bootstrap_path = File.join(ENV['ANVIL_LOCAL_DIR'],
@@ -61,12 +71,5 @@ end
 desc 'snapshot ADDRESS', 'Preform a package snapshot'
 long_desc <<-LONGDESC
 LONGDESC
-loki_command(:snapshot) do |address|
-  ENV['RAILS_ENV'] = 'snapshot'
-  ENV['ANVIL_BASE_URL'] = "http://#{address}"
-  ENV['ANVIL_UPSTREAM'] = 'https://forge-api.alces-flight.com'
-  ENV['ANVIL_LOCAL_DIR'] = File.expand_path('opt/anvil/public',
-                                            FlightDirect.root_dir)
-  Snapshot.start
-end
+loki_command(:snapshot) { |address| Snapshot.start([address]) }
 
