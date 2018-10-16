@@ -33,6 +33,13 @@ class Snapshot < Thor::Group
     File.write(bootstrap_path, new_bootstrap_content)
   end
 
+  def download_flight_direct_tarball
+    puts 'Downloading FlightDirect tarball'
+    fd_path = File.join(ENV['ANVIL_LOCAL_DIR'],
+                        'flight-direct/flight-direct.tar.gz')
+    download(flight_direct_url, fd_path)
+  end
+
   def database_setup
     run_rake('db:setup')
   end
@@ -52,6 +59,10 @@ class Snapshot < Thor::Group
   end
 
   private
+
+  def flight_direct_url
+    "https://s3-eu-west-1.amazonaws.com/flight-direct/releases/el7/flight-direct-#{FlightDirect::VERSION}.tar.gz"
+  end
 
   def bootstrap_url
     'https://raw.githubusercontent.com/alces-software/flight-direct/master/scripts/bootstrap.sh'
