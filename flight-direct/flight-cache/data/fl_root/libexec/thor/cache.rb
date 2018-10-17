@@ -8,9 +8,10 @@ require 'open-uri'
 class Snapshot < Thor::Group
   argument :address, type: :string
 
-  # NOTE: The following methods are ran in the order they have been defined
-  # Some of the tasks are order dependent (e.g. download/import)
-  def setup
+  # Sets up the environment correctly when the object is initialized
+  # NOTE: Not Thread Safe
+  def initialize(*_a, **_h, &_b)
+    super
     ENV['RAILS_ENV'] = 'snapshot'
     ENV['ANVIL_BASE_URL'] = "http://#{address}"
     ENV['ANVIL_UPSTREAM'] = 'https://forge-api.alces-flight.com'
@@ -18,6 +19,8 @@ class Snapshot < Thor::Group
                                               FlightDirect.root_dir)
   end
 
+  # NOTE: The following methods are ran in the order they have been defined
+  # Some of the tasks are order dependent (e.g. download/import)
   def download_flight_direct_bootstrap_script
     puts 'Downloading FlightDirect bootstrap'
     bootstrap_path = File.join(ENV['ANVIL_LOCAL_DIR'],
