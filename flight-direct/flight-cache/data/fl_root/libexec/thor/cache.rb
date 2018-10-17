@@ -1,6 +1,12 @@
 #: SYNOPSIS: Manage the flight-cache server
 #: ROOT: true
 
+ENV['BUNDLE_GEMFILE'] = File.join(FlightDirect.root_dir,
+                                  'opt/flight-cache/Gemfile')
+require 'bundler/setup'
+
+require 'json'
+require 'parallel'
 require 'flight_config'
 require 'thor/group'
 require 'open-uri'
@@ -52,7 +58,7 @@ class Snapshot < Thor::Group
       target = File.join(ENV['ANVIL_LOCAL_DIR'], 'git', "#{repo}.tar.gz")
       print `rm -rf #{source} #{target}`
       print `mkdir -p #{File.dirname(target)}`
-      puts `git clone #{url} #{source}`
+      print `git clone #{url} #{source}`
       puts `tar --warning=no-file-changed -C #{source} -czf #{target} .`
     end
     # Renames packager-base to be the volatile repo
@@ -69,7 +75,18 @@ class Snapshot < Thor::Group
 
   def download_packages
     puts 'Downloading packages...'
-    run_rake('packages:download')
+    raise 'The ANVIL_UPSTREAM has not been set' unless ENV['ANVIL_UPSTREAM']
+    raise 'The ANVIL_LOCAL_DIR has not been set' unless ENV['ANVIL_LOCAL_DIR']
+    packages = JSON.parse(
+      Net::HTTP.get(URI("#{ENV['ANVIL_UPSTREAM']}/v1/packages")),
+      object_class: OpenStruct
+    )
+    Parallel.map(packages.data, in_threads: 10) do |metadata|
+      uri = URI.parse(metadata.attributes.packageUrl)
+      puts "Downloading: #{uri.to_s}"
+      path = package_path(URI.unescape(uri.path))
+      download(uri.to_s, path)
+    end
   end
 
   def import_packages
@@ -101,13 +118,20 @@ class Snapshot < Thor::Group
 
   def run_rake(command)
     dir = File.join(FlightDirect.root_dir, 'opt/anvil')
-    exit_code = system("cd #{dir} && rake #{command}")
-    raise "'rake #{cmd}' exited with non-zero status: #{exit_code}"
+    raise <<-ERROR unless system("cd #{dir} && rake #{command}")
+'rake #{command}' exited with non-zero status: #{$?}
+ERROR
+  end
+
+  def package_path(relative_path)
+    File.join(ENV['ANVIL_LOCAL_DIR'], 'packages', relative_path)
   end
 end
 
 desc 'snapshot ADDRESS', 'Preform a package snapshot'
 long_desc <<-LONGDESC
 LONGDESC
-loki_command(:snapshot) { |address| Snapshot.start([address]) }
+loki_command(:snapshot) do |address|
+  Bundler.with_clean_env { Snapshot.start([address]) }
+end
 
