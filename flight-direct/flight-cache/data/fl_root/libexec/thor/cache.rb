@@ -23,6 +23,7 @@ class Snapshot < Thor::Group
     ENV['ANVIL_UPSTREAM'] = 'https://forge-api.alces-flight.com'
     ENV['ANVIL_LOCAL_DIR'] = File.expand_path('opt/anvil/public',
                                               FlightDirect.root_dir)
+    ENV['ANVIL_IMPORT_DIR'] = File.join(ENV['ANVIL_LOCAL_DIR'], 'packages')
   end
 
   # NOTE: The following methods are ran in the order they have been defined
