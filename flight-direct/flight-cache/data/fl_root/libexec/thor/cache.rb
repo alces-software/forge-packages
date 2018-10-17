@@ -101,7 +101,8 @@ class Snapshot < Thor::Group
 
   def run_rake(command)
     dir = File.join(FlightDirect.root_dir, 'opt/anvil')
-    system("cd #{dir} && rake #{command}")
+    exit_code = system("cd #{dir} && rake #{command}")
+    raise "'rake #{cmd}' exited with non-zero status: #{exit_code}"
   end
 end
 
