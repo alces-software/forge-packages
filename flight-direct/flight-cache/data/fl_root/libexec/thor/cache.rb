@@ -95,7 +95,7 @@ class Snapshot < Thor::Group
   end
 
   def enable_systemctl
-    system('systemctl enable anvil')
+    system('systemctl enable flight-cache')
   end
 
   private

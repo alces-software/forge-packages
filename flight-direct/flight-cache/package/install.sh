@@ -19,7 +19,7 @@ cd $FL_ROOT/opt/anvil
 bundle install --without development --with default snapshot
 
 # Sets up systemd integration for anvil
-systemd=/usr/lib/systemd/system/anvil.service
+systemd=/usr/lib/systemd/system/flight-cache.service
 cat << SYSTEMD > $systemd
 [Unit]
 Description=Runs the anvil cache server
