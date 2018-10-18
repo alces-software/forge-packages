@@ -7,7 +7,6 @@ require 'bundler/setup'
 
 require 'json'
 require 'parallel'
-require 'flight_config'
 require 'thor/group'
 require 'open-uri'
 
