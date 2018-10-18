@@ -1,7 +1,5 @@
 #!/bin/bash
 
-scripts_dir=$FL_ROOT/opt/anvil/scripts
-
 # Moves the directories in place
 cp -r ./fl_root/* $FL_ROOT
 
@@ -17,7 +15,7 @@ fi
 source ~/.bashrc
 
 # Installs the gems
-cd $scripts_dir/..
+cd $FL_ROOT/opt/anvil
 bundle install --without development --with default snapshot
 
 # Sets up systemd integration for anvil
@@ -29,7 +27,7 @@ Requires=network.target
 Requires=postgresql.service
 [Service]
 Type=simple
-ExecStart=/bin/bash $scripts_dir/start-anvil.sh
+ExecStart=/bin/bash $FL_ROOT/opt/flight-cache/scripts/start-anvil.sh
 TimeoutSec=30
 [Install]
 WantedBy=multi-user.target
