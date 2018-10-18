@@ -3,20 +3,10 @@
 # Moves the directories in place
 cp -r ./fl_root/* $FL_ROOT
 
-# Installs the required packages
-yum -y -e0 install gcc
-
 # Installs postgres if it is missing
 if ! which postgres 2>&1 >/dev/null; then
   ./setup-postgres.sh
 fi
-
-# Ensures the profile has been sourced
-source ~/.bashrc
-
-# Installs the gems
-cd $FL_ROOT/opt/anvil
-bundle install --without development --with default snapshot
 
 # Sets up systemd integration for anvil
 systemd=/usr/lib/systemd/system/flight-cache.service
