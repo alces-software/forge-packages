@@ -7,6 +7,11 @@ yum install wget -y
 # Extracts the compiled version of postgres
 bash ./extract-postgres.sh
 
+# Compile the anvil/rails gems
+pushd $FL_ROOT/opt/anvil > /dev/null
+bundle install --without development --with snapshot
+popd > /dev/null
+
 # Creates the postgres user
 user=postgres
 adduser $user
