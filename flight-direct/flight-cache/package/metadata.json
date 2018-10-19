@@ -4,6 +4,8 @@
     "name": "flight-cache",
     "version": "0.0.3",
     "summary": "Sets up this machine as the flight-cache",
-    "dependencies": []
+    "dependencies": [
+      "postgres"
+    ]
   }
 }
