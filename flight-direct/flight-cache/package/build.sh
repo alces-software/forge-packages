@@ -28,6 +28,26 @@ pushd "${temp_dir}/fl_root/opt/flight-cache" > /dev/null
 bundle install --path vendor/bundle
 popd > /dev/null
 
+# Pulls in the compiled version of postgres
+pushd $temp_dir > /dev/null
+#
+# The commented code was used to create the tarball, It is being kept as a
+# future reference
+#
+# Fetches the postgres source code
+# postgres='postgresql-9.6.9'
+# wget https://ftp.postgresql.org/pub/source/v9.6.9/$postgres.tar.gz
+# tar -xzf $postgres.tar.gz
+# cd $postgres
+#
+# Configures and installs postgres
+# ./configure --prefix=/usr
+# make world -j $(nproc)
+# make install-world -j $(nproc)
+#
+wget https://s3-eu-west-1.amazonaws.com/flight-direct/extract-postgres.sh
+popd > /dev/null
+
 pushd "${temp_dir}" > /dev/null
 zip -r ${package_name}.zip *
 popd > /dev/null
