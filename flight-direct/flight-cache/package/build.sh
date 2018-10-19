@@ -5,6 +5,8 @@ set -e
 package_name='flight-cache'
 anvil_tag='0.2.0'
 
+yum install -y -e0 postgresql-devel wget
+
 if [ -f ./${package_name}.zip ]; then
   echo "Replacing existing ${package_name}.zip in this directory"
   rm ./${package_name}.zip
