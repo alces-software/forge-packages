@@ -1,1 +1,1 @@
-'alces storage'           - configure and address storage facilities
+'flight storage'           - configure and address storage facilities
