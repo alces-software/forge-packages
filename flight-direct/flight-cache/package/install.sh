@@ -5,6 +5,7 @@ cp -r ./fl_root/* $FL_ROOT
 
 # Install the anvil gems
 cd $FL_ROOT/opt/anvil
+bundle config build.pg --with-pg-config=$FL_ROOT/opt/postgres/bin/pg_config
 bundle install --with snapshot default --without development
 
 # Sets up systemd integration for anvil

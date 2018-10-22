@@ -27,8 +27,7 @@ git checkout $anvil_tag
 # Remove the .git directory
 rm -rf .git
 
-bundle config build.pg --with-pg-config=$FL_ROOT/opt/postgres/bin/pg_config
-bundle package
+bundle package --no-install
 pushd > /dev/null
 
 # Installs the flight-cache gems
