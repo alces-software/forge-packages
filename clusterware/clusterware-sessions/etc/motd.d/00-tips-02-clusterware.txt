@@ -1,1 +1,1 @@
-'alces session'           - start and manage interactive sessions
+'flight session'          - start and manage interactive sessions
