@@ -45,7 +45,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker help [<command>]
+    $cw_BINNAME gridware docker help [<command>]
 
   DESCRIPTION:
 
@@ -59,7 +59,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker list
+    $cw_BINNAME gridware docker list
 
   DESCRIPTION:
 
@@ -72,7 +72,7 @@ help_for_build() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker build [OPTIONS] <package> [--variant <variant>] [<package> [--variant <variant>] ...]
+    $cw_BINNAME gridware docker build [OPTIONS] <package> [--variant <variant>] [<package> [--variant <variant>] ...]
 
   DESCRIPTION:
 
@@ -104,7 +104,7 @@ help_for_push() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker push [OPTIONS] <package>
+    $cw_BINNAME gridware docker push [OPTIONS] <package>
 
   DESCRIPTION:
 
@@ -123,7 +123,7 @@ help_for_pull() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker pull <package>
+    $cw_BINNAME gridware docker pull <package>
 
   DESCRIPTION:
 
@@ -137,7 +137,7 @@ help_for_run() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker run [OPTIONS] <package> [<runmode>] [PARAMS...]
+    $cw_BINNAME gridware docker run [OPTIONS] <package> [<runmode>] [PARAMS...]
 
   DESCRIPTION:
 
@@ -196,7 +196,7 @@ help_for_share() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker share <package>
+    $cw_BINNAME gridware docker share <package>
 
   DESCRIPTION:
 
@@ -204,7 +204,7 @@ help_for_share() {
     cluster.
 
     The image must already be available on the node from which this command is
-    run (e.g. have been used with 'alces gridware docker pull' or 'alces
+    run (e.g. have been used with '$cw_BINNAME gridware docker pull' or '$cw_BINNAME
     gridware docker run'). Other nodes in the cluster will automatically import
     the image, making it available to run on each node.
 
@@ -215,7 +215,7 @@ help_for_start-registry() {
     cat <<EOF
   SYNOPSIS:
 
-    alces gridware docker start-registry
+    $cw_BINNAME gridware docker start-registry
 
   DESCRIPTION:
 
