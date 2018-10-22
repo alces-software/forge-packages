@@ -12,7 +12,7 @@ bundle config build.pg --with-pg-config=$FL_ROOT/opt/postgres/bin/pg_config
 bundle install --local --with snapshot default --without development
 
 # Sets up systemd integration for anvil
-systemd=/usr/lib/systemd/system/flight-cache.service
+systemd=/etc/systemd/system/flight-cache.service
 cat << SYSTEMD > $systemd
 [Unit]
 Description=Runs the anvil cache server
