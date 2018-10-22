@@ -2,7 +2,7 @@
   "type": "packages",
   "attributes": {
     "name": "clusterware-storage",
-    "version": "2.1.1-dev",
+    "version": "2.1.2",
     "summary": "Clusterware storage utilities",
     "dependencies": [
       "alces/pdsh"
