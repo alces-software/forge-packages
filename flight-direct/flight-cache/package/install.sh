@@ -14,7 +14,7 @@ cat << SYSTEMD > $systemd
 [Unit]
 Description=Runs the anvil cache server
 Requires=network.target
-Requires=postgres-flight.service
+Requires=postgresql-flight.service
 [Service]
 Type=simple
 ExecStart=/bin/bash $FL_ROOT/opt/flight-cache/scripts/start-anvil.sh

@@ -27,7 +27,7 @@ set -e
 # Writes the systemd config file
 # Modified from:
 # https://unix.stackexchange.com/questions/220362/systemd-postgresql-start-script
-service=postgres-flight
+service=postgresql-flight
 systemd=/usr/lib/systemd/system/$service.service
 cat << SYSTEMD > $systemd
 [Unit]
