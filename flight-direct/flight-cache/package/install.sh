@@ -1,12 +1,15 @@
 #!/bin/bash
 
+# Installs the required dependencies
+yum install -y -e0 gcc
+
 # Moves the directories in place
 cp -r ./fl_root/* $FL_ROOT
 
 # Install the anvil gems
 cd $FL_ROOT/opt/anvil
 bundle config build.pg --with-pg-config=$FL_ROOT/opt/postgres/bin/pg_config
-bundle install --with snapshot default --without development
+bundle install --local --with snapshot default --without development
 
 # Sets up systemd integration for anvil
 systemd=/usr/lib/systemd/system/flight-cache.service
