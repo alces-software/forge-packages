@@ -45,7 +45,7 @@ help_for_disable() {
     cat <<EOF
   SYNOPSIS:
 
-    alces tips disable
+    $cw_BINNAME tips disable
 
   DESCRIPTION:
 
@@ -58,7 +58,7 @@ help_for_enable() {
     cat <<EOF
   SYNOPSIS:
 
-    alces tips enable
+    $cw_BINNAME tips enable
 
   DESCRIPTION:
 
@@ -71,7 +71,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces tips [list]
+    $cw_BINNAME tips [list]
 
   DESCRIPTION:
 
@@ -84,7 +84,7 @@ help_for_show() {
     cat <<EOF
   SYNOPSIS:
 
-    alces tips [show] [--short] [--random|<topic>]
+    $cw_BINNAME tips [show] [--short] [--random|<topic>]
 
   DESCRIPTION:
 
@@ -99,7 +99,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces tips help [<command>]
+    $cw_BINNAME tips help [<command>]
 
   DESCRIPTION:
 
