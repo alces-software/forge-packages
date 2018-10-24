@@ -162,7 +162,7 @@ prompt will be updated to include the name of your cluster.
 
 Once configured, you can access the information required to
 configure further nodes as part of your cluster by running the
-"$(echo -e "\e[1;37m")alces about identity$(echo -e "\e[0m")" command.
+"$(echo -e "\e[1;37m")$cw_BINNAME about identity$(echo -e "\e[0m")" command.
 
 EOF
 }
