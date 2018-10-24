@@ -1,30 +1,23 @@
 #!/bin/bash
 
+# Installs the required dependencies
+yum install -y -e0 gcc
+
 # Moves the directories in place
 cp -r ./fl_root/* $FL_ROOT
 
-# Installs the required packages
-yum -y -e0 install gcc
-
-# Installs postgres if it is missing
-if ! which postgres 2>&1 >/dev/null; then
-  ./setup-postgres.sh
-fi
-
-# Ensures the profile has been sourced
-source ~/.bashrc
-
-# Installs the gems
+# Install the anvil gems
 cd $FL_ROOT/opt/anvil
-bundle install --without development --with default snapshot
+bundle config build.pg --with-pg-config=$FL_ROOT/opt/postgres/bin/pg_config
+bundle install --local --with snapshot default --without development
 
 # Sets up systemd integration for anvil
-systemd=/usr/lib/systemd/system/flight-cache.service
+systemd=/etc/systemd/system/flight-cache.service
 cat << SYSTEMD > $systemd
 [Unit]
 Description=Runs the anvil cache server
 Requires=network.target
-Requires=postgresql.service
+Requires=postgresql-flight.service
 [Service]
 Type=simple
 ExecStart=/bin/bash $FL_ROOT/opt/flight-cache/scripts/start-anvil.sh
@@ -38,5 +31,9 @@ systemctl daemon-reload
 
 # Sets the node to build off its local cache
 # This means all future packages will be installed from the cache
-echo "FL_CONFIG_CACHE_URL=http://localhost" >> $FL_ROOT/var/flight.conf
-
+# It also sets the location of the public directory so it can be used by
+# flight-syncer
+cat << EOF >> $FL_ROOT/var/flight.conf
+FL_CONFIG_CACHE_URL=http://localhost
+FL_CONFIG_PUBLIC_DIR=$FL_ROOT/opt/anvil/public
+EOF

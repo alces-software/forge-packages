@@ -1,0 +1,9 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "postgres",
+    "version": "9.6.9+flight0",
+    "summary": "Installs a flight direct specific version of postgres",
+    "dependencies": []
+  }
+}

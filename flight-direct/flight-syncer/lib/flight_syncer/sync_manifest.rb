@@ -1,6 +1,7 @@
 
 require 'yaml'
 require 'open-uri'
+require 'fileutils'
 
 module FlightSyncer
   class SyncManifest
