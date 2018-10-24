@@ -45,7 +45,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces howto list
+    $cw_BINNAME howto list
 
   DESCRIPTION:
 
@@ -58,8 +58,8 @@ help_for_show() {
     cat <<EOF
   SYNOPSIS:
 
-    alces howto show <index|name>
-    alces howto <index|name>
+    $cw_BINNAME howto show <index|name>
+    $cw_BINNAME howto <index|name>
 
   DESCRIPTION:
 
@@ -76,7 +76,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces howto help [<command>]
+    $cw_BINNAME howto help [<command>]
 
   DESCRIPTION:
 
