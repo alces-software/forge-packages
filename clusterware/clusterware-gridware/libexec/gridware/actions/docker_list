@@ -56,7 +56,7 @@ main() {
     done
 }
 
-cw_BINNAME="alces gridware"
+cw_BINNAME="$cw_BINNAME gridware"
 
 setup
 require action

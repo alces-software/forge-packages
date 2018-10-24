@@ -38,7 +38,7 @@ if [ "" ]; then 0; else eval 'cw_RUBY_EXEC "$@" || exit 1'; fi; end
 if Process.euid != 0
   v = `bash -c 'source #{ENV['cw_ROOT']}/etc/gridware.rc 2> /dev/null && echo ${cw_GRIDWARE_allow_users}'`.chomp
   if v == 'false'
-    STDERR.puts "alces gridware: user-level access is unavailable; contact your support representative for package installations"
+    STDERR.puts "flight gridware: user-level access is unavailable; contact your support representative for package installations"
     exit(1)
   end
   ENV['cw_GRIDWARE_userspace'] = ENV['USER']
@@ -64,7 +64,7 @@ else
 
   if ! File.exist?("#{ENV['cw_GRIDWARE_root']}/etc/gridware.yml") &&
      ! File.exist?("#{ENV['cw_ROOT']}/etc/gridware.yml")
-    STDERR.puts "alces gridware: uninitialized; try 'alces gridware init' first"
+    STDERR.puts "flight gridware: uninitialized; try 'flight gridware init' first"
     exit 1
   end
 end
