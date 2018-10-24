@@ -45,7 +45,7 @@ help_for_add() {
     cat <<EOF
   SYNOPSIS:
 
-    alces sync add <name> <directory>
+    $cw_BINNAME sync add <name> <directory>
 
   DESCRIPTION:
 
@@ -59,7 +59,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces sync help [<command>]
+    $cw_BINNAME sync help [<command>]
 
   DESCRIPTION:
 
@@ -73,7 +73,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces sync list
+    $cw_BINNAME sync list
 
   DESCRIPTION:
 
@@ -86,7 +86,7 @@ help_for_pull() {
     cat <<EOF
   SYNOPSIS:
 
-    alces sync pull [OPTIONS] [<name>]
+    $cw_BINNAME sync pull [OPTIONS] [<name>]
 
   DESCRIPTION:
 
@@ -109,7 +109,7 @@ help_for_purge() {
     cat <<EOF
   SYNOPSIS:
 
-    alces sync purge <name>
+    $cw_BINNAME sync purge <name>
 
   DESCRIPTION:
 
@@ -124,7 +124,7 @@ help_for_push() {
     cat <<EOF
   SYNOPSIS:
 
-    alces sync push [<name>]
+    $cw_BINNAME sync push [<name>]
 
   DESCRIPTION:
 
@@ -139,7 +139,7 @@ help_for_remove() {
     cat <<EOF
   SYNOPSIS:
 
-    alces sync remove <name>
+    $cw_BINNAME sync remove <name>
 
   DESCRIPTION:
 
