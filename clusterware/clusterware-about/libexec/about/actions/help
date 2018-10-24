@@ -45,7 +45,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces about list
+    $cw_BINNAME about list
 
   DESCRIPTION:
 
@@ -58,8 +58,8 @@ help_for_show() {
     cat <<EOF
   SYNOPSIS:
 
-    alces about show <index|name>
-    alces about [<index|name>]
+    $cw_BINNAME about show <index|name>
+    $cw_BINNAME about [<index|name>]
 
   DESCRIPTION:
 
@@ -77,7 +77,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces about help [<command>]
+    $cw_BINNAME about help [<command>]
 
   DESCRIPTION:
 
