@@ -10,19 +10,32 @@ require 'parallel'
 require 'thor/group'
 require 'open-uri'
 
-class Snapshot < Thor::Group
-  argument :address, type: :string
-
-  # Sets up the environment correctly when the object is initialized
-  # NOTE: Not Thread Safe
+class BaseRailsGroup < Thor::Group
   def initialize(*_a, **_h, &_b)
     super
     ENV['RAILS_ENV'] = 'snapshot'
-    ENV['ANVIL_BASE_URL'] = "http://#{address}"
-    ENV['ANVIL_UPSTREAM'] = 'https://forge-api.alces-flight.com'
     ENV['ANVIL_LOCAL_DIR'] = File.expand_path('opt/anvil/public',
                                               FlightDirect.root_dir)
     ENV['ANVIL_IMPORT_DIR'] = File.join(ENV['ANVIL_LOCAL_DIR'], 'packages')
+  end
+
+  private
+
+  def run_rake(command)
+    dir = File.join(FlightDirect.root_dir, 'opt/anvil')
+    raise <<-ERROR unless system("cd #{dir} && rake #{command}")
+'rake #{command}' exited with non-zero status: #{$?}
+ERROR
+  end
+end
+
+class Snapshot < BaseRailsGroup
+  argument :address, type: :string
+
+  def initialize(*_a, **_h, &_b)
+    super
+    ENV['ANVIL_BASE_URL'] = "http://#{address}"
+    ENV['ANVIL_UPSTREAM'] = 'https://forge-api.alces-flight.com'
   end
 
   # NOTE: The following methods are ran in the order they have been defined
@@ -116,13 +129,6 @@ class Snapshot < Thor::Group
     end
   end
 
-  def run_rake(command)
-    dir = File.join(FlightDirect.root_dir, 'opt/anvil')
-    raise <<-ERROR unless system("cd #{dir} && rake #{command}")
-'rake #{command}' exited with non-zero status: #{$?}
-ERROR
-  end
-
   def package_path(relative_path)
     File.join(ENV['ANVIL_LOCAL_DIR'], 'packages', relative_path)
   end
@@ -133,5 +139,29 @@ long_desc <<-LONGDESC
 LONGDESC
 loki_command(:snapshot) do |address|
   Bundler.with_clean_env { Snapshot.start([address]) }
+end
+
+
+class Drop < BaseRailsGroup
+  def drop_database
+    run_rake('db:drop')
+  end
+
+  ['flight-direct', 'packages', 'git'].each do |dir|
+    define_method(:"delete_#{dir}") do
+      path = File.join(ENV['ANVIL_LOCAL_DIR'], dir)
+      puts "Deleting: #{path}"
+      FileUtils.rm_rf path
+    end
+  end
+
+  def disable_systemctl
+    system('systemctl disable flight-cache')
+  end
+end
+
+desc 'drop', 'Drops the cached snapshot'
+loki_command(:drop) do
+  Bundler.with_clean_env { Drop.start([]) }
 end
 
