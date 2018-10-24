@@ -46,7 +46,7 @@ help_for_get-output() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue get-output <queue> <job_id> <output_file>
+    $cw_BINNAME customize job-queue get-output <queue> <job_id> <output_file>
 
   DESCRIPTION:
 
@@ -60,7 +60,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue help [<command>]
+    $cw_BINNAME customize job-queue help [<command>]
 
   DESCRIPTION:
 
@@ -74,7 +74,7 @@ help_for_list-jobs() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue list-jobs <queue>
+    $cw_BINNAME customize job-queue list-jobs <queue>
 
   DESCRIPTION:
 
@@ -87,7 +87,7 @@ help_for_list-output() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue list-output <queue>
+    $cw_BINNAME customize job-queue list-output <queue>
 
   DESCRIPTION:
 
@@ -100,7 +100,7 @@ help_for_list-queues() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue list-queues
+    $cw_BINNAME customize job-queue list-queues
 
   DESCRIPTION:
 
@@ -113,7 +113,7 @@ help_for_put() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue put <queue> <FILE>
+    $cw_BINNAME customize job-queue put <queue> <FILE>
 
   DESCRIPTION:
 
@@ -126,7 +126,7 @@ help_for_rm() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue rm <queue> <job_id>
+    $cw_BINNAME customize job-queue rm <queue> <job_id>
 
   DESCRIPTION:
 
@@ -139,7 +139,7 @@ help_for_status() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize job-queue status <queue> <job_id>
+    $cw_BINNAME customize job-queue status <queue> <job_id>
 
   DESCRIPTION:
 
