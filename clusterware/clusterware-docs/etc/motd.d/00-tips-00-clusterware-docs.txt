@@ -6,6 +6,6 @@
 ################################################################################
 TIPS:
 
-'alces help'              - get help on available commands
-'alces howto'             - guides on how to use your research environment
-'alces template'          - tailored job script templates
+'flight help'             - get help on available commands
+'flight howto'            - guides on how to use your research environment
+'flight template'         - tailored job script templates

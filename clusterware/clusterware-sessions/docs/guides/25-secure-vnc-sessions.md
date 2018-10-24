@@ -27,7 +27,7 @@ how to provision an Alces Flight Access appliance.
 ## CLUSTERWARE VPN
 
 Clusterware may be configured with an OpenVPN service.  Refer to the
-`alces about vpn` command to locate the configuration files for your
+`flight about vpn` command to locate the configuration files for your
 platform.  You can find OpenVPN downloads and documentation for your
 client system at <https://openvpn.net/>.
 

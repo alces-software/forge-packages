@@ -144,9 +144,9 @@ customize_slave_help() {
   cat <<EOF
 SYNOPSIS:
 
-  alces customize slave add <repo>/<profile>
-  alces customize slave remove <repo>/<profile>
-  alces customize slave list
+  $cw_BINNAME customize slave add <repo>/<profile>
+  $cw_BINNAME customize slave remove <repo>/<profile>
+  $cw_BINNAME customize slave list
 
 DESCRIPTION:
   Manage customization profiles to be executed by slave nodes on boot.

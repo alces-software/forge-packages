@@ -45,7 +45,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute help [<command>]
+    $cw_BINNAME compute help [<command>]
 
   DESCRIPTION:
 
@@ -59,7 +59,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute list
+    $cw_BINNAME compute list
 
   DESCRIPTION:
 
@@ -72,7 +72,7 @@ help_for_addq() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute addq <queue> [<size> [<min> [<max>]]]
+    $cw_BINNAME compute addq <queue> [<size> [<min> [<max>]]]
 
   DESCRIPTION:
 
@@ -88,7 +88,7 @@ help_for_delq() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute delq <queue>
+    $cw_BINNAME compute delq <queue>
 
   DESCRIPTION:
 
@@ -101,7 +101,7 @@ help_for_modq() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute modq <queue> <size> <min> <max>
+    $cw_BINNAME compute modq <queue> <size> <min> <max>
 
   DESCRIPTION:
 
@@ -115,7 +115,7 @@ help_for_expand() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute expand <queue> <size>
+    $cw_BINNAME compute expand <queue> <size>
 
   DESCRIPTION:
 
@@ -131,7 +131,7 @@ help_for_reduce() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute reduce <queue> <size>
+    $cw_BINNAME compute reduce <queue> <size>
 
   DESCRIPTION:
 
@@ -147,7 +147,7 @@ help_for_shoot() {
     cat <<EOF
   SYNOPSIS:
 
-    alces compute shoot <queue> <node>
+    $cw_BINNAME compute shoot <queue> <node>
 
   DESCRIPTION:
 

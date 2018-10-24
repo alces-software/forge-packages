@@ -45,7 +45,7 @@ help_for_copy() {
     cat <<EOF
   SYNOPSIS:
 
-    alces template copy <index|name> <target>
+    $cw_BINNAME template copy <index|name> <target>
 
   DESCRIPTION:
 
@@ -60,7 +60,7 @@ help_for_info() {
     cat <<EOF
   SYNOPSIS:
 
-    alces template info <index|name>
+    $cw_BINNAME template info <index|name>
 
   DESCRIPTION:
 
@@ -77,7 +77,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces template list
+    $cw_BINNAME template list
 
   DESCRIPTION:
 
@@ -90,7 +90,7 @@ help_for_show() {
     cat <<EOF
   SYNOPSIS:
 
-    alces template show <index|name>
+    $cw_BINNAME template show <index|name>
 
   DESCRIPTION:
 
@@ -103,7 +103,7 @@ help_for_prepare() {
     cat <<EOF
   SYNOPSIS:
 
-    alces template prepare <index|name>
+    $cw_BINNAME template prepare <index|name>
 
   DESCRIPTION:
 
@@ -117,7 +117,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces template help [<command>]
+    $cw_BINNAME template help [<command>]
 
   DESCRIPTION:
 

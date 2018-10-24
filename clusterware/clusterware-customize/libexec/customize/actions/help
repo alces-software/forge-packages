@@ -45,7 +45,7 @@ help_for_apply() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize apply [OPTIONS] <profile>
+    $cw_BINNAME customize apply [OPTIONS] <profile>
 
   DESCRIPTION:
 
@@ -53,7 +53,7 @@ help_for_apply() {
     node or, optionally, a list of other nodes in the cluster.
 
     A list of available customization profiles can be shown by
-    running "alces customize avail".
+    running "$cw_BINNAME customize avail".
 
     Once downloaded, the customization will have its configure event
     triggered, along with a member-join event for each current member
@@ -74,7 +74,7 @@ help_for_avail() {
   cat <<EOF
 SYNOPSIS:
 
-  alces customize avail
+  $cw_BINNAME customize avail
 
 DESCRIPTION:
 
@@ -87,7 +87,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize help [<command>]
+    $cw_BINNAME customize help [<command>]
 
   DESCRIPTION:
 
@@ -105,7 +105,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces handler list [OPTIONS]
+    $cw_BINNAME handler list [OPTIONS]
 
   DESCRIPTION:
 
@@ -123,7 +123,7 @@ help_for_pull() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize pull
+    $cw_BINNAME customize pull
 
   DESCRIPTION:
 
@@ -136,7 +136,7 @@ help_for_trigger() {
     cat <<EOF
   SYNOPSIS:
 
-    alces customize trigger [OPTIONS] <event> [<profile>]
+    $cw_BINNAME customize trigger [OPTIONS] <event> [<profile>]
 
   DESCRIPTION:
 
@@ -156,7 +156,7 @@ help_for_push() {
   cat <<EOF
   SYNOPSIS:
 
-    alces customize push <source> [repository] [hook]
+    $cw_BINNAME customize push <source> [repository] [hook]
 
   DESCRIPTION:
 

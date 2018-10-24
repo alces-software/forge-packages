@@ -45,7 +45,7 @@ help_for_show() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage show
+    $cw_BINNAME storage show
 
   DESCRIPTION:
 
@@ -60,7 +60,7 @@ help_for_avail() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage avail
+    $cw_BINNAME storage avail
 
   DESCRIPTION:
 
@@ -73,7 +73,7 @@ help_for_configure() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage configure [OPTIONS] <name> <type> [PARAMS...]
+    $cw_BINNAME storage configure [OPTIONS] <name> <type> [PARAMS...]
 
   DESCRIPTION:
 
@@ -99,7 +99,7 @@ help_for_enable() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage enable <type>
+    $cw_BINNAME storage enable <type>
 
   DESCRIPTION:
 
@@ -112,7 +112,7 @@ help_for_forget() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage forget [OPTIONS] <name>
+    $cw_BINNAME storage forget [OPTIONS] <name>
 
   DESCRIPTION:
 
@@ -131,7 +131,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage help [<command>]
+    $cw_BINNAME storage help [<command>]
 
   DESCRIPTION:
 
@@ -145,7 +145,7 @@ help_for_use() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage use [OPTIONS] <name>
+    $cw_BINNAME storage use [OPTIONS] <name>
 
   DESCRIPTION:
 
@@ -168,7 +168,7 @@ help_for_put() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage put [OPTIONS] <source> [<target>]
+    $cw_BINNAME storage put [OPTIONS] <source> [<target>]
 
   DESCRIPTION:
 
@@ -183,7 +183,7 @@ help_for_put() {
     -n <name>
      Use storage configuration with <name>.  If not specified, the
      current default (if present) will be used.  Change the default
-     with "alces storage use".
+     with "$cw_BINNAME storage use".
 
     -r, -R
      Recursively put a local <source> directory to a remote <target>
@@ -195,7 +195,7 @@ help_for_get() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage get [OPTIONS] <source> [<target>]
+    $cw_BINNAME storage get [OPTIONS] <source> [<target>]
 
   DESCRIPTION:
 
@@ -209,7 +209,7 @@ help_for_get() {
     -n <name>
      Use storage configuration with <name>.  If not specified, the
      current default (if present) will be used.  Change the default
-     with "alces storage use".
+     with "$cw_BINNAME storage use".
 
     -r, -R
      Recursively get a remote <source> directory to a local <target>
@@ -225,7 +225,7 @@ help_for_rm() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage rm [OPTIONS] <path>
+    $cw_BINNAME storage rm [OPTIONS] <path>
 
   DESCRIPTION:
 
@@ -236,7 +236,7 @@ help_for_rm() {
     -n <name>
      Use storage configuration with <name>.  If not specified, the
      current default (if present) will be used.  Change the default
-     with "alces storage use".
+     with "$cw_BINNAME storage use".
 
     -r, -R
      Recursively remove a remote directory at <path>.  You will be
@@ -252,7 +252,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage list [OPTIONS] [<path>]
+    $cw_BINNAME storage list [OPTIONS] [<path>]
 
   DESCRIPTION:
 
@@ -263,7 +263,7 @@ help_for_list() {
     -n <name>
      Use storage configuration with <name>.  If not specified, the
      current default (if present) will be used.  Change the default
-     with "alces storage use".
+     with "$cw_BINNAME storage use".
 
 EOF
 }
@@ -272,8 +272,8 @@ help_for_mkbucket() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage mkbucket [OPTIONS] <name>
-    alces storage mkdir [OPTIONS] <name>
+    $cw_BINNAME storage mkbucket [OPTIONS] <name>
+    $cw_BINNAME storage mkdir [OPTIONS] <name>
 
   DESCRIPTION:
 
@@ -285,7 +285,7 @@ help_for_mkbucket() {
     -n <name>
      Use storage configuration with <name>.  If not specified, the
      current default (if present) will be used.  Change the default
-     with "alces storage use".
+     with "$cw_BINNAME storage use".
 
 EOF
 }
@@ -294,8 +294,8 @@ help_for_rmbucket() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage rmbucket [OPTIONS] <name>
-    alces storage rmdir [OPTIONS] <name>
+    $cw_BINNAME storage rmbucket [OPTIONS] <name>
+    $cw_BINNAME storage rmdir [OPTIONS] <name>
 
   DESCRIPTION:
 
@@ -307,7 +307,7 @@ help_for_rmbucket() {
     -n <name>
      Use storage configuration with <name>.  If not specified, the
      current default (if present) will be used.  Change the default
-     with "alces storage use".
+     with "$cw_BINNAME storage use".
 
 EOF
 }
@@ -316,7 +316,7 @@ help_for_addbucket() {
     cat <<EOF
   SYNOPSIS:
 
-    alces storage addbucket [OPTIONS] <name>
+    $cw_BINNAME storage addbucket [OPTIONS] <name>
 
   DESCRIPTION:
 
@@ -325,7 +325,7 @@ help_for_addbucket() {
     This acts as a convenient reminder or hint that further buckets
     are available when using a storage configuration, even if it is
     not owned by the configured account (e.g. public buckets).
-    External buckets will be shown when using "alces storage list"
+    External buckets will be shown when using "$cw_BINNAME storage list"
     with no parameters.
 
     Note that not all storage backends support this operation.
@@ -335,7 +335,7 @@ help_for_addbucket() {
     -n <name>
      Use storage configuration with <name>.  If not specified, the
      current default (if present) will be used.  Change the default
-     with "alces storage use".
+     with "$cw_BINNAME storage use".
 
 EOF
 }

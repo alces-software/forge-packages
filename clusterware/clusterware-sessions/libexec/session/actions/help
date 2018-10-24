@@ -45,7 +45,7 @@ help_for_avail() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session avail
+    $cw_BINNAME session avail
 
   DESCRIPTION:
 
@@ -59,7 +59,7 @@ help_for_clean() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session clean [<session identity>]
+    $cw_BINNAME session clean [<session identity>]
 
   DESCRIPTION:
 
@@ -82,7 +82,7 @@ help_for_disable() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session disable <type>
+    $cw_BINNAME session disable <type>
 
   DESCRIPTION:
 
@@ -96,7 +96,7 @@ help_for_enable() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session enable [<repository>/]<type> [PARAMS...]
+    $cw_BINNAME session enable [<repository>/]<type> [PARAMS...]
 
   DESCRIPTION:
 
@@ -123,7 +123,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session help [<command>]
+    $cw_BINNAME session help [<command>]
 
   DESCRIPTION:
 
@@ -137,7 +137,7 @@ help_for_info() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session info [OPTIONS] <session identity>
+    $cw_BINNAME session info [OPTIONS] <session identity>
 
   DESCRIPTION:
 
@@ -159,7 +159,7 @@ help_for_kill() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session kill <session identity>
+    $cw_BINNAME session kill <session identity>
 
   DESCRIPTION:
 
@@ -175,7 +175,7 @@ help_for_list() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session list [OPTIONS]
+    $cw_BINNAME session list [OPTIONS]
 
   DESCRIPTION:
 
@@ -201,7 +201,7 @@ help_for_start() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session start [OPTIONS] <type> [PARAMS...]
+    $cw_BINNAME session start [OPTIONS] <type> [PARAMS...]
 
   DESCRIPTION:
 
@@ -237,7 +237,7 @@ help_for_update() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session update [<repository> <url>]
+    $cw_BINNAME session update [<repository> <url>]
 
   DESCRIPTION:
 
@@ -256,7 +256,7 @@ help_for_wait() {
     cat <<EOF
   SYNOPSIS:
 
-    alces session wait <session identity>
+    $cw_BINNAME session wait <session identity>
 
   DESCRIPTION:
 

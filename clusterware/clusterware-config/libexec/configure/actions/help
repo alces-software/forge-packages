@@ -74,7 +74,7 @@ help_for_node() {
     cat <<EOF
   SYNOPSIS:
 
-    alces configure node
+    $cw_BINNAME configure node
 
   DESCRIPTION:
 
@@ -87,7 +87,7 @@ help_for_autoscaling() {
     cat <<EOF
   SYNOPSIS:
 
-    alces configure autoscaling [enable|disable|status]
+    $cw_BINNAME configure autoscaling [enable|disable|status]
 
   DESCRIPTION:
 
@@ -101,7 +101,7 @@ help_for_hyperthreading() {
     cat <<EOF
   SYNOPSIS:
 
-    alces configure hyperthreading [enable|disable|status]
+    $cw_BINNAME configure hyperthreading [enable|disable|status]
 
   DESCRIPTION:
 
@@ -115,9 +115,9 @@ help_for_scheduler() {
     cat <<EOF
   SYNOPSIS:
 
-    alces configure scheduler [status]
-    alces configure scheduler allocation <strategy>
-    alces configure scheduler submission <strategy>
+    $cw_BINNAME configure scheduler [status]
+    $cw_BINNAME configure scheduler allocation <strategy>
+    $cw_BINNAME configure scheduler submission <strategy>
 
   DESCRIPTION:
 
@@ -139,7 +139,7 @@ help_for_help() {
     cat <<EOF
   SYNOPSIS:
 
-    alces configure help [<command>]
+    $cw_BINNAME configure help [<command>]
 
   DESCRIPTION:
 
@@ -153,7 +153,7 @@ help_for_thp() {
   cat <<EOF
   SYNOPSIS:
 
-    alces configure thp [enable|disable|status]
+    $cw_BINNAME configure thp [enable|disable|status]
 
   DESCRIPTION:
 
@@ -170,7 +170,7 @@ help_for_clocksource() {
   cat <<EOF
   SYNOPSIS:
 
-    alces configure clocksource [default|$sources]
+    $cw_BINNAME configure clocksource [default|$sources]
 
   DESCRIPTION:
 
@@ -188,7 +188,7 @@ help_for_dropcache() {
   cat <<EOF
   SYNOPSIS:
 
-    alces configure dropcache <pagecache|slabobjs|both>
+    $cw_BINNAME configure dropcache <pagecache|slabobjs|both>
 
   DESCRIPTION:
 

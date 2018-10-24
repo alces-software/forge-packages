@@ -132,10 +132,10 @@ clocksource_list() {
     files_load_config --optional cluster-clocksource
     clocksources="default $(_clocksource_get_available)"
     cur=$(cat $cw_CLOCKSOURCE_current_file)
-    
+
     if [[ ! -z "$cw_CLUSTER_clocksource" ]] && [[ "$cw_CLUSTER_clocksource" != "$cur" ]]; then
         action_warn "Conflict between system clocksource and config detected"
-        action_warn "Run to fix conflict: alces configure clocksource <source>"
+        action_warn "Run to fix conflict: $cw_BINNAME configure clocksource <source>"
     fi
     if [[ -z "$cw_CLUSTER_default_clocksource" ]]; then
         default_set="default"

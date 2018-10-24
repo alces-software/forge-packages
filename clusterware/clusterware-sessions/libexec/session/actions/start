@@ -273,8 +273,8 @@ You should consider securing your session by:
  * connecting via the Clusterware VPN
  * using an SSH port forward (either manually, or via a tool like "ssvnc")
 
-Please run the "alces howto secure-vnc-sessions" command for further details or
-refer to the Alces Flight Compute documentation <http://docs.alces-flight.com>.
+Please run the "flight howto secure-vnc-sessions" command for further details
+or refer to the Alces Flight Compute documentation <http://docs.alces-flight.com>.
 
 EOF
            while [ "$confirm" != "y" -a "${confirm}" != "n" ]; do

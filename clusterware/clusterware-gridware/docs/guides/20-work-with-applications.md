@@ -28,18 +28,18 @@ see the "How to run graphical jobs" guide
 
 ## ALCES GRIDWARE UTILITY
 
-The `alces gridware` utility provides a simple interface for installing
+The `flight gridware` utility provides a simple interface for installing
 applications, compilers and accelerated libraries to your environment. 
 Only privileged users of an environment are granted access to the Gridware
 utility.
 
 To view all of the available Gridware packages: 
 
-    alces gridware list
+    flight gridware list
 
 To search for specific Gridware packages by name: 
 
-    alces gridware search --name python
+    flight gridware search --name python
     base/apps/ipython/2.3.0   base/apps/python/2.7.3    base/apps/python/2.7.5
     base/apps/python/2.7.8    base/apps/python3/3.2.3   base/apps/python3/3.3.3
     base/apps/python3/3.4.0   base/apps/python3/3.4.3   base/libs/biopython/1.61
@@ -48,7 +48,7 @@ To search for specific Gridware packages by name:
 To install an application to your environment, making it 
 immediately available for use via the `module` command:
 
-    alces gridware install apps/memtester/4.3.0
+    flight gridware install apps/memtester/4.3.0
 
 ## THE MODULE COMMAND
 
