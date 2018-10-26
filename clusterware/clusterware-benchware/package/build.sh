@@ -2,7 +2,7 @@
 
 package_name='clusterware-benchware'
 
-VERSION="2018.1.1"
+VERSION="2018.1.2"
 
 if [ -f ./${package_name}.zip ]; then
   echo "Replacing existing ${package_name}.zip in this directory"
