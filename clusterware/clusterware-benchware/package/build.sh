@@ -2,7 +2,7 @@
 
 package_name='clusterware-benchware'
 
-VERSION="2018.1.1"
+VERSION=$(grep version metadata.json |awk '{print $2}' |sed 's/,//g;s/"//g')
 
 if [ -f ./${package_name}.zip ]; then
   echo "Replacing existing ${package_name}.zip in this directory"
