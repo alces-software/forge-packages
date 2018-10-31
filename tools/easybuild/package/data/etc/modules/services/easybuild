@@ -35,7 +35,7 @@ A software installation framework in Python that allows you to install
                ======================================
 
 This module sets up your environment for the use of the 'easybuild'
-service. This module sets up version '3.5.3' of the service.
+service. This module sets up version '3.7.1' of the service.
 
 
 >> SYNOPSIS <<
@@ -87,9 +87,9 @@ package.
 }
 
 set     app     easybuild
-set     version 3.5.3
+set     version 3.7.1
 set     appcaps EASYBUILD
-set     appdir  /opt/clusterware/opt/easybuild
+set     appdir  /opt/flight-direct/opt/easybuild
 
 module-whatis   "
 
@@ -100,7 +100,7 @@ module-whatis   "
               URL: http://easybuilders.github.io/easybuild/
 
              Name: easybuild
-          Version: 3.5.3
+          Version: 3.7.1
            Module: [alces pretty services/easybuild]
       Module path: /opt/clusterware/etc/modules/services/easybuild
      Package path: /opt/clusterware/opt/easybuild
@@ -112,14 +112,14 @@ For further information, execute:
 
 conflict EasyBuild
 
-set root ${appdir}/software/EasyBuild/3.5.3
+set root ${appdir}/software/EasyBuild/3.7.1
 
 setenv ${appcaps}DIR ${appdir}
 setenv ${appcaps}BIN ${root}/bin
 
 setenv EBROOTEASYBUILD "$root"
-setenv EBVERSIONEASYBUILD "3.5.3"
-setenv EBDEVELEASYBUILD "$root/easybuild/EasyBuild-3.5.3-easybuild-devel"
+setenv EBVERSIONEASYBUILD "3.7.1"
+setenv EBDEVELEASYBUILD "$root/easybuild/EasyBuild-3.7.1-easybuild-devel"
 
 prepend-path PYTHONPATH $root/lib/python2.7/site-packages
 
@@ -131,3 +131,4 @@ setenv EASYBUILD_MODULE_SYNTAX Tcl
 setenv EASYBUILD_MODULES_TOOL EnvironmentModulesC
 
 prepend-path MODULEPATH $::env(HOME)/.local/easybuild/modules/all
+prepend-path MODULEPATH ${appdir}/modules/all
