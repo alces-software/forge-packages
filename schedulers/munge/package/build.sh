@@ -16,8 +16,8 @@ mkdir -p "${temp_dir}"/data
 cp -r ../init "${temp_dir}"/data
 
 # Build MUNGE.
-MUNGE_SOURCE='https://github.com/dun/munge/archive/munge-0.5.12.zip'
-MUNGE_PATH="/opt/clusterware/opt/munge"
+MUNGE_SOURCE='https://github.com/dun/munge/archive/munge-0.5.13.zip'
+MUNGE_PATH="${cw_ROOT}/opt/munge"
 rm -rf "${MUNGE_PATH}" # Get rid of any old version of MUNGE so not building on top of.
 curl -L "${MUNGE_SOURCE}" -o /tmp/munge.zip
 unzip -d /tmp /tmp/munge.zip

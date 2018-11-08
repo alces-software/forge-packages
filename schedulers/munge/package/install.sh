@@ -14,13 +14,13 @@ fi
 cp -R data/opt "${cw_ROOT}"
 
 sed -e "s,_cw_ROOT_,${cw_ROOT},g" \
-  data/init/systemd/clusterware-slurm-munged.service \
-  > /etc/systemd/system/clusterware-slurm-munged.service
+  data/init/systemd/flight-slurm-munged.service \
+  > /etc/systemd/system/flight-slurm-munged.service
 
 # munged is fussy about these permissions
-chmod g-w "${cw_ROOT}/opt/"
+chmod g-w "${cw_ROOT}" "${cw_ROOT}/opt/"
 
-systemctl enable clusterware-slurm-munged.service
+systemctl enable flight-slurm-munged.service
 
 # Create MUNGE user and group.
 getent group munge &>/dev/null || groupadd --gid 363 munge
@@ -29,3 +29,20 @@ getent passwd munge &>/dev/null || useradd --uid 363 --gid 363 \
 
 # MUNGE user needs to own this.
 chown -R munge:munge "${cw_ROOT}/opt/munge/var"
+chmod 0711 "${cw_ROOT}"/opt/munge/var/run/munge
+
+# Create MUNGE key, required for authentication between nodes - must be the
+# same on all nodes so create by hashing the cluster name.
+munge_path="$(echo ~munge)"
+munge_key_dir="${munge_path}/etc/munge"
+munge_key="${munge_key_dir}/munge.key"
+munge_user='munge'
+
+if [ "${FL_CONFIG_CLUSTERNAME}" ]; then
+  echo -n "${FL_CONFIG_CLUSTERNAME}" | sha512sum | cut -d' ' -f1 > "${munge_key}"
+  chmod 400 "${munge_key}"
+  chown -R "${munge_user}:${munge_user}" "${munge_key_dir}"
+else
+  echo "Unable to determine cluster name for MUNGE key generation, exiting."
+  exit 1
+fi

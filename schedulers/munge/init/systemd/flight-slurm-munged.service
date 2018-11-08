@@ -1,12 +1,12 @@
 ################################################################################
 ##
 ## Alces Clusterware - Systemd service unit file
-## Copyright (c) 2016 Alces Software Ltd
+## Copyright (c) 2016-2018 Alces Software Ltd
 ##
 ################################################################################
 # MUNGE daemon (systemd service unit)
 [Unit]
-Description=Alces Clusterware MUNGE daemon
+Description=Alces Flight MUNGE daemon
 After=syslog.target
 After=network.target
 
