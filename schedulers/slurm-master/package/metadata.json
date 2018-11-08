@@ -2,7 +2,7 @@
   "type": "packages",
   "attributes": {
     "name": "slurm-master",
-    "version": "16.5.0+1clusterware0",
+    "version": "2.1.3",
     "summary": "Slurm scheduler - master node configuration",
     "dependencies": [
       "alces/slurm-common"
