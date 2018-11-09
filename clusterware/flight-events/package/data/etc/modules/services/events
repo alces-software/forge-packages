@@ -53,7 +53,7 @@ modifications it will apply, execute:
 "
 }
 
-set     appdir  _ROOT_/opt
+set     appdir  _cw_ROOT_/opt
 
 module-whatis   "
 
@@ -63,7 +63,7 @@ module-whatis   "
 
              Name: events
            Module: [alces pretty services/events]
-      Module path: _ROOT_/etc/modules/services/events
+      Module path: _cw_ROOT_/etc/modules/services/events
 
 For further information, execute:
 

@@ -1,11 +1,10 @@
 {
   "type": "packages",
   "attributes": {
-    "name": "clusterware-events",
-    "version": "2.0.0-dev",
+    "name": "flight-events",
+    "version": "2.1.3",
     "username": "alces",
-    "summary": "Clusterware event handler framework",
-    "tagNames": ["clusterware_core"],
+    "summary": "Flight Direct event handler framework",
     "dependencies": [
       "alces/serf",
       "alces/pluginhook",

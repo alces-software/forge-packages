@@ -1,6 +1,6 @@
 #!/bin/bash
 
-package_name='clusterware-events'
+package_name='flight-events'
 
 if [ -f ./${package_name}.zip ]; then
   echo "Replacing existing ${package_name}.zip in this directory"

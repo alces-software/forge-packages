@@ -1,18 +1,18 @@
 ################################################################################
 ##
-## Alces Clusterware - Systemd service unit file
-## Copyright (c) 2015 Alces Software Ltd
+## Alces Flight Direct - Systemd service unit file
+## Copyright (c) 2015-2018 Alces Software Ltd
 ##
 ################################################################################
 # Serf Agent (systemd service unit)
 [Unit]
-Description=Alces Clusterware Serf Agent
+Description=Alces Flight Direct Events Agent
 After=syslog.target
 After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/opt/clusterware/opt/serf/bin/serf agent -config-dir=/opt/clusterware/etc/serf
+ExecStart=_cw_ROOT_/opt/serf/bin/serf agent -config-dir=_cw_ROOT_/etc/serf
 # Use SIGINT instead of SIGTERM so serf can depart the cluster.
 KillSignal=SIGINT
 # Restart on success, failure, and any emitted signals like HUP.

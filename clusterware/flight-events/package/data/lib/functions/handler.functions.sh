@@ -1,5 +1,5 @@
 #==============================================================================
-# Copyright (C) 2015 Stephen F. Norledge and Alces Software Ltd.
+# Copyright (C) 2015-2018 Stephen F. Norledge and Alces Software Ltd.
 #
 # This file/package is part of Alces Clusterware.
 #
@@ -26,9 +26,6 @@ require log
 cw_HANDLER_PLUGINDIR="${cw_ROOT}/etc/handlers"
 export PLUGIN_PATH="$cw_HANDLER_PLUGINDIR"
 cw_HANDLER_HOOK_RUNNER="${cw_ROOT}/opt/pluginhook/bin/pluginhook"
-cw_HANDLER_REPODIR="${cw_ROOT}/var/lib/handler/repos"
-cw_HANDLER_DEFAULT_REPO="base"
-cw_HANDLER_DEFAULT_REPO_URL="${cw_HANDLER_DEFAULT_REPO_URL:-https://:@github.com/alces-software/clusterware-handlers}"
 cw_HANDLER_BROADCASTER="${cw_ROOT}/opt/serf/bin/serf"
 cw_HANDLER_name="$(cd "$(dirname "$0")" && basename "$(pwd)" | sed 's/^[0-9]*-//g'):$(basename "$0")"
 
@@ -37,30 +34,6 @@ handler_run_hook() {
     event="$1"
     shift
     "$cw_HANDLER_HOOK_RUNNER" "$event" "$@"
-}
-
-handler_is_enabled() {
-    repo_plugin_is_enabled "${cw_HANDLER_PLUGINDIR}" "$@"
-}
-
-handler_repo_exists() {
-    repo_exists "${cw_HANDLER_REPODIR}" "$@"
-}
-
-handler_exists() {
-    repo_plugin_exists "${cw_HANDLER_REPODIR}" "$@"
-}
-
-handler_install() {
-    repo_plugin_install "${cw_HANDLER_REPODIR}" "$@"
-}
-
-handler_enable() {
-    repo_plugin_enable "${cw_HANDLER_REPODIR}" "${cw_HANDLER_PLUGINDIR}" "$@"
-}
-
-handler_disable() {
-    repo_plugin_disable "${cw_HANDLER_PLUGINDIR}" "$@"
 }
 
 handler_broadcast() {
