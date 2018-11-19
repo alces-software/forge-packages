@@ -23,7 +23,7 @@ require ruby
 require repo
 require log
 
-cw_HANDLER_PLUGINDIR="${cw_ROOT}/etc/handlers"
+cw_HANDLER_PLUGINDIR="${cw_ROOT}/etc/events"
 export PLUGIN_PATH="$cw_HANDLER_PLUGINDIR"
 cw_HANDLER_HOOK_RUNNER="${cw_ROOT}/opt/pluginhook/bin/pluginhook"
 cw_HANDLER_BROADCASTER="${cw_ROOT}/opt/serf/bin/serf"

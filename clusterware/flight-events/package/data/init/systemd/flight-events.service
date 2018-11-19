@@ -12,7 +12,8 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=_cw_ROOT_/opt/serf/bin/serf agent -config-dir=_cw_ROOT_/etc/serf
+SyslogIdentifier=flight-events
+ExecStart=/bin/bash -c "FL_ROOT=_cw_ROOT_ _cw_ROOT_/opt/serf/bin/serf agent -config-dir=_cw_ROOT_/etc/serf"
 # Use SIGINT instead of SIGTERM so serf can depart the cluster.
 KillSignal=SIGINT
 # Restart on success, failure, and any emitted signals like HUP.

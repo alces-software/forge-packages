@@ -1,5 +1,7 @@
 #!/bin/sh
 
+yum install -y -e0 newt
+
 cp -r data/etc "${cw_ROOT}"
 cp -r data/lib "${cw_ROOT}"
 cp -r data/libexec "${cw_ROOT}"

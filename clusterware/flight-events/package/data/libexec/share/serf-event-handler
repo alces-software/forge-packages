@@ -21,6 +21,7 @@
 # https://github.com/alces-software/clusterware
 #==============================================================================
 setup() {
+    cw_ROOT=${cw_ROOT:-$FL_ROOT}
     source "${FL_ROOT}"/etc/runtime.sh
     kernel_load
 }
