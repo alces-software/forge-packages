@@ -1,0 +1,24 @@
+#!/bin/bash
+################################################################################
+##
+## Flight Direct - Slurm support script
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+
+. $(dirname $0)/common
+
+if _lock; then
+  name="$(echo "$1" | cut -f1 -d.)"
+  partition="$2"
+
+  # Remove from the partition node list
+  sed -i -r -e "/PartitionName=$partition / s/,?$name,/,/" \
+      -e "/PartitionName=$partition / s/Nodes=,/Nodes=/" \
+      -e "/PartitionName=$partition / s/Nodes= /Nodes=, /" \
+      "${cw_CLUSTER_SLURM_config}"
+
+  _unlock
+else
+  echo "Locking failed; unable to prune node"
+fi

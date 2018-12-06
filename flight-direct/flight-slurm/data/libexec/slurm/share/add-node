@@ -1,0 +1,39 @@
+#!/bin/bash
+################################################################################
+##
+## Flight Direct - Slurm support script
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+
+. $(dirname $0)/common
+
+if _lock; then
+  name="$(echo "$1" | cut -f1 -d.)"
+  slots="${2:-1}"
+  mem_mib="$3"
+  state="$4"
+
+  tmpfile1="$(mktemp /tmp/flight-slurm.add-node.XXXXXXXX)"
+  tmpfile2="$(mktemp /tmp/flight-slurm.add-node.XXXXXXXX)"
+
+  echo "Adding node ${name} with ${slots} CPUs"
+  grep -v "^NodeName=" "${cw_CLUSTER_SLURM_config}" > "${tmpfile1}"
+  # if NodeName line already exists for this node, remove it first
+  grep "^NodeName=" "${cw_CLUSTER_SLURM_config}" | grep -v "^NodeName=${name} " > "${tmpfile2}"
+  line="NodeName=${name} CPUs=${slots}"
+  if [ "$mem_mib" ]; then
+      line="${line} RealMemory=$mem_mib"
+  fi
+  if [ "${state}" ]; then
+      line="${line} State=${state}"
+  fi
+  echo "${line}" >> "${tmpfile2}"
+  # sort list
+  sort "${tmpfile2}" >> "${tmpfile1}"
+  # recreate slurm.conf
+  cat "${tmpfile1}" > "${cw_CLUSTER_SLURM_config}"
+  _unlock
+fi
+
+rm -f "${tmpfile1}" "${tmpfile2}"

@@ -1,0 +1,27 @@
+#!/bin/bash
+################################################################################
+##
+## Flight Direct - Slurm support script
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+
+. $(dirname $0)/common
+
+if _lock; then
+  name="$(echo "$1" | cut -f1 -d.)"
+  tmpfile="$(mktemp /tmp/cluster-slurm.add-node.XXXXXXXX)"
+
+  # Remove the node's entry line
+  grep -v "^NodeName=${name} " "${cw_CLUSTER_SLURM_config}" > "${tmpfile}"
+
+  # Remove from any partitions' node lists too
+  sed -i -r -e "s/(Nodes.*)([=,])${name}(,)?/\1\2/" -e "s/(Nodes.*),,[[:space:]]*/\1,/" "$tmpfile"
+
+  cat "${tmpfile}" > "${cw_CLUSTER_SLURM_config}"
+  rm -f "${tmpfile}"
+
+  _unlock
+else
+  echo "Locking failed; unable to prune node"
+fi

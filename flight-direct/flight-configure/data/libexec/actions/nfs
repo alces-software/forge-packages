@@ -1,0 +1,74 @@
+: '
+: NAME: nfs
+: SYNOPSIS: Manage NFS exports and mounts
+: VERSION: 1.0.0
+: ROOT: true
+: '
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+# vim: set filetype=sh :
+action=$1
+shift
+cw_BINNAME="${cw_BINNAME} $(basename "$0")"
+
+case $action in
+    h|he|hel|help)
+        exec /bin/bash ${cw_ROOT}/libexec/nfs/actions/help "$@"
+        ;;
+    c|co|con|conf|confi|config|configu|configur|configure)
+        exec /bin/bash ${cw_ROOT}/libexec/nfs/actions/configure "$@"
+        ;;
+    e|ex|exp|expo|expor|export)
+        exec /bin/bash ${cw_ROOT}/libexec/nfs/actions/export "$@"
+        ;;
+    u|un|une|unex|unexp|unexpo|unexpor|unexport)
+        exec /bin/bash ${cw_ROOT}/libexec/nfs/actions/unexport "$@"
+        ;;
+    l|ls|li|lis|list)
+        exec /bin/bash ${cw_ROOT}/libexec/nfs/actions/list "$@"
+        ;;
+    m|mo|mou|moun|mount)
+        exec /bin/bash ${cw_ROOT}/libexec/nfs/actions/mount "$@"
+        ;;
+    s|st|sta|star|start)
+        exec /bin/bash ${cw_ROOT}/libexec/nfs/actions/start "$@"
+        ;;
+    *)
+        cat <<EOF
+Usage: $cw_BINNAME COMMAND [[OPTION]... [ARGS]]
+Manage NFS exports and mounts.
+
+Commands:
+EOF
+printf "  %-28s  %s\n" "$cw_BINNAME help" "More help about this command."
+printf "  %-28s  %s\n" "$cw_BINNAME configure" "Configure the NFS service."
+printf "  %-28s  %s\n" "$cw_BINNAME export" "Add an exported filesystem."
+printf "  %-28s  %s\n" "$cw_BINNAME unexport" "Remove an exported filesystem."
+printf "  %-28s  %s\n" "$cw_BINNAME list" "List exported filesystems."
+printf "  %-28s  %s\n" "$cw_BINNAME mount" "Mount exported filesystems."
+printf "  %-28s  %s\n" "$cw_BINNAME start" "Start NFS services."
+cat <<EOF
+
+Please report bugs to support@alces-software.com
+Alces Software home page: <http://alces-software.com/>
+EOF
+esac

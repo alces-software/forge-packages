@@ -1,0 +1,25 @@
+#!/bin/bash
+################################################################################
+##
+## Flight Direct - Slurm support script
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+flight module purge
+flight module use "${cw_ROOT}"/etc/modules
+flight module load services/slurm
+
+. $(dirname $0)/common
+
+name="$1"
+
+if ! sinfo -o "%R" -a | grep "^$name$"; then
+  if _lock; then
+    echo "Creating new partition $name"
+    # Slurm docs lie; we need a trailing comma after empty nodelist for it to be valid
+    echo "PartitionName=$name Nodes=," >> "${cw_CLUSTER_SLURM_config}"
+    _unlock
+  else
+    echo "Could not obtain lock; can't add partition"
+  fi
+fi

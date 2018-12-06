@@ -1,0 +1,35 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Flight Direct - Event hook
+## Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    cw_ROOT=${cw_ROOT:-$FL_ROOT}
+    source "${FL_ROOT}"/etc/runtime.sh
+    kernel_load
+}
+
+main() {
+    local slots
+
+    eval "$(member_parse)"
+    echo "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}" 1>&2
+
+    slots=$(member_find_tag "slots" "${cw_MEMBER_tags}")
+
+    if [ "${cw_MEMBER_role}" == "compute" ]; then
+        echo "${cw_MEMBER_name} is Slurm compute node" 1>&2
+	flight slurm add-node "${cw_MEMBER_name}" "${slots}"
+    else
+        echo "${cw_MEMBER_name} is non-compute node" 1>&2
+	flight slurm add-node "${cw_MEMBER_name}" "1" "" "FUTURE"
+    fi
+}
+
+setup
+require member
+require handler
+
+handler_tee main "$@"

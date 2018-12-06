@@ -1,0 +1,202 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Flight Direct.
+#
+# Alces Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Alces Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Alces Flight Direct, please visit:
+# https://github.com/alces-software/clusterware
+#==============================================================================
+setup() {
+    cw_ROOT=${cw_ROOT:-$FL_ROOT}
+    source "${FL_ROOT}"/etc/runtime.sh
+    kernel_load
+    PATH="${cw_ROOT}"/bin:$PATH
+}
+
+_install_events() {
+    flight forge install flight-events
+    ruby_run <<EOF
+require 'json'
+require 'fileutils'
+require 'digest/md5'
+auth = Digest::MD5.hexdigest("${clustername}")
+config = {
+  'rpc_auth' => auth,
+  'tags' => {
+    'role' => "${role}"
+  }
+}.tap do |cfg|
+  cfg['retry_join'] = ['${master}'] if '${master_is_local}'.empty?
+end
+File.write("${cw_ROOT}/etc/serf/config.json",
+           config.to_json,
+           perm: 0600)
+FileUtils.mkdir_p("${cw_ROOT}/etc/config/cluster")
+File.write("${cw_ROOT}/etc/config/cluster/auth.rc",
+           "cw_CLUSTER_auth_token=#{auth}",
+           perm: 0600)
+EOF
+    cat <<EOF > "${cw_ROOT}"/var/lib/flight-configurator/start.d/05-flight-events
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Flight Direct.
+#==============================================================================
+flight events start
+EOF
+    chmod 0700 "${cw_ROOT}"/var/lib/flight-configurator/start.d/05-flight-events
+}
+
+_install_scheduler() {
+    flight forge install flight-slurm-events
+    cat <<EOF > "${cw_ROOT}"/var/lib/flight-configurator/start.d/10-flight-slurm
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Flight Direct.
+#==============================================================================
+flight slurm configure --defaults
+flight slurm start
+EOF
+    chmod 0700 "${cw_ROOT}"/var/lib/flight-configurator/start.d/10-flight-slurm
+}
+
+_install_starter() {
+    mkdir -p "${cw_ROOT}"/var/lib/flight-configurator/start.d
+    cat <<EOF > "${cw_ROOT}"/etc/cron.reboot/flight-starter
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Flight Direct.
+#==============================================================================
+PATH="${cw_ROOT}"/bin:$PATH
+run-parts "${cw_ROOT}"/var/lib/flight-configurator/start.d
+EOF
+    chmod 0700 "${cw_ROOT}"/etc/cron.reboot/flight-starter
+}
+
+_install_nfs() {
+    flight forge install flight-nfs
+}
+
+_install_custom_script() {
+    if [ "${script_url}" ]; then
+	if ! curl ${script_url} > "${cw_ROOT}"/var/lib/flight-configurator/start.d/01-custom-script; then
+	    rm -f "${cw_ROOT}"/var/lib/flight-configurator/start.d/01-custom-script
+	else
+	    chmod 0700 "${cw_ROOT}"/var/lib/flight-configurator/start.d/01-custom-script
+	fi
+    fi
+}
+
+_setup_base() {
+    _install_starter
+    _install_events
+    _install_scheduler
+    _install_nfs
+    _install_custom_script
+}
+
+_setup_login() {
+    flight forge install flight-login
+    _setup_base
+    cat <<EOF > "${cw_ROOT}"/var/lib/flight-configurator/start.d/50-flight-nfs
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Flight Direct.
+#==============================================================================
+flight nfs start
+flight nfs export /home
+mkdir -p /opt/sw
+flight nfs export /opt/sw
+EOF
+    chmod 0700 "${cw_ROOT}"/var/lib/flight-configurator/start.d/50-flight-nfs
+}
+
+_setup_compute() {
+    flight forge install flight-compute
+    _setup_base
+    cat <<EOF > "${cw_ROOT}"/var/lib/flight-configurator/start.d/50-flight-nfs
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Alces Flight Direct.
+#==============================================================================
+setenforce 0
+flight nfs start
+flight nfs mount
+EOF
+    chmod 0700 "${cw_ROOT}"/var/lib/flight-configurator/start.d/50-flight-nfs
+}
+
+_start() {
+    run-parts "${cw_ROOT}"/var/lib/flight-configurator/start.d
+}
+
+main() {
+    local role identity clustername master script_url master_is_local
+    if files_wait_for_file "${cw_ROOT}/etc/config/flight.yml" 30; then
+	eval $(
+	    ruby_run <<RUBY
+require 'yaml'
+
+config_data = YAML.load_file("${cw_ROOT}/etc/config/flight.yml") rescue {}
+cluster_data = config_data['cluster'] rescue {}
+role = cluster_data['role'] rescue nil
+identity = cluster_data['identity'] rescue nil
+name = cluster_data['name'] rescue nil
+master = cluster_data['master'] rescue nil
+script_url = cluster_data['script_url'] rescue nil
+
+puts "clustername=#{name}"
+puts "role=#{role}"
+puts "identity=#{identity}"
+puts "master=#{master}"
+puts "script_url=#{script_url}"
+RUBY
+	)
+	if [ -z "$master" ]; then
+	    master_is_local=true
+	    master=$(network_get_iface_address $(network_get_first_iface))
+	fi
+	flight config set clustername=${clustername} role=${role} masterip=${master}
+	set -a
+	. "$FL_ROOT"/var/flight.conf
+	set +a
+	if [ "${role}" == "login" ]; then
+	    _setup_login
+	    _start
+	elif [ "${role}" == "compute" ]; then
+	    _setup_compute
+	    _start
+	else
+	    action_die "unknown role in configuration: '${role}'"
+	fi
+    else
+	action_die "configuration file unavailable"
+    fi
+}
+
+setup
+
+require ruby
+require action
+require network
+require files
+
+main "$@"

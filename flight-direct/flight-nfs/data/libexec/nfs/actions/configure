@@ -1,0 +1,109 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+_write() {
+    local key val
+    key="$1"
+    val="$2"
+    ruby_run <<RUBY
+require 'yaml'
+require 'fileutils'
+
+config = YAML.load_file('${cw_ROOT}/etc/config/nfs.yml') rescue {
+  master_ip: "${FL_CONFIG_MASTERIP:-10.10.0.1}"
+}
+
+ops = []
+ops << lambda do
+  FileUtils.mkdir_p("${cw_ROOT}/etc/config")
+  File.write("${cw_ROOT}/etc/config/nfs.yml",config.to_yaml)
+end
+
+case "${key}"
+when 'master_ip'
+  config[:master_ip] = "${val}"
+end
+
+ops.each(&:call)
+RUBY
+}
+
+_read() {
+    local key
+    key="$1"
+    ruby_run <<RUBY
+require 'yaml'
+
+config = YAML.load_file('${cw_ROOT}/etc/config/nfs.yml') rescue {
+  master_ip: "${FL_CONFIG_MASTERIP:-10.10.0.1}"
+}
+
+case "${key}"
+when 'master_ip'
+  puts config[:master_ip]
+end
+RUBY
+}
+
+_set() {
+    local val rc name key
+    name="$1"
+    key="$2"
+    val=$(
+	whiptail --title " ${cw_BINNAME}: Configure $name " \
+	    --inputbox "$name" 8 78 "$(_read $key)" \
+	    3>&1 1>&2 2>&3
+    )
+    rc=$?
+    if [ $rc == 0 ]; then
+	_write "$key" $val
+    fi
+}
+
+main() {
+    local choice
+    while true; do
+	choice=$(
+	    whiptail --title " ${cw_BINNAME}: Configuration " \
+		--menu "Choose an option" 25 78 16 \
+		"Master IP" "Set IP address of NFS management node" \
+		"Quit" "Quit configuration" \
+		3>&1 1>&2 2>&3
+	)
+	case "${choice}" in
+	    "Master IP")
+		_set "Master IP" "master_ip"
+		;;
+	    *)
+		break
+		;;
+	esac
+    done
+}
+
+t1=brightblue
+t2=green
+NEWT_COLORS="root=,$t1:checkbox=,$t1:entry=,$t1:label=$t1,:actlistbox=,$t1:helpline=,$t1:roottext=,$t1:emptyscale=$t1:disabledentry=$t1,:button=white,$t2:title=white,blue:actsellistbox=white,$t2"
+
+require ruby
+
+main "$@"

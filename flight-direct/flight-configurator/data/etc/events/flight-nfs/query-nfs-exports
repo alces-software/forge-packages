@@ -1,0 +1,9 @@
+#!/bin/bash
+require network
+
+if list=$("$cw_ROOT"/bin/flight nfs list 2>/dev/null); then
+    addr="$(network_get_iface_address $(network_get_first_iface))"
+    for mnt in $(echo "$list" | cut -f2 -d:); do
+	echo -n "${addr}:$mnt "
+    done
+fi

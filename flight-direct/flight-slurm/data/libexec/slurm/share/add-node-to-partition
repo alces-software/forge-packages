@@ -1,0 +1,22 @@
+#!/bin/bash
+################################################################################
+##
+## Flight Direct - Slurm support script
+## Copyright (C) 2016-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+
+. $(dirname $0)/common
+
+hostname="$1"
+group="$2"
+
+if _lock; then
+  echo "Adding node $hostname to partition $group"
+  sed -i -e "/PartitionName=$group / s/Nodes=\([^ ]*\)\(.*\)/Nodes=$hostname,\1\2/" \
+         -e "/PartitionName=$group / s/,,/,/" \
+         "${cw_CLUSTER_SLURM_config}"
+  _unlock
+else
+  echo "Could not obtain lock; can't update partition"
+fi

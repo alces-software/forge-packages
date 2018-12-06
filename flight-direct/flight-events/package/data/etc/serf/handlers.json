@@ -1,0 +1,5 @@
+{
+  "event_handlers": [
+    "_cw_ROOT_/libexec/share/serf-event-handler"
+  ]
+}

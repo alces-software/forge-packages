@@ -2,11 +2,7 @@
 require files
 files_load_config distro
 
-if [[ "$cw_DIST" == "el6" || "$cw_DIST" == "el7" ]]; then
-  yum install -y -e0 tcl
-elif [[ "$cw_DIST" == "ubuntu1604" ]]; then
-  apt-get install -y tcl
-fi
+yum install -y -e0 tcl
 
 cp -R data/* "${cw_ROOT}"
 

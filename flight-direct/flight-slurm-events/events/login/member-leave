@@ -1,0 +1,26 @@
+#!/bin/bash
+################################################################################
+##
+## Alces Flight Direct - Event hook
+## Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+setup() {
+    cw_ROOT=${cw_ROOT:-$FL_ROOT}
+    source "${FL_ROOT}"/etc/runtime.sh
+    kernel_load
+}
+
+main() {
+    eval "$(member_parse)"
+    echo "Member data parsed: ${cw_MEMBER_name} (${cw_MEMBER_ip}) -- ${cw_MEMBER_tags}" 1>&2
+
+    echo "${cw_MEMBER_name} left; removing from Slurm configuration" 1>&2
+    flight slurm rm-node "${cw_MEMBER_name}"
+}
+
+setup
+require member
+require handler
+
+handler_tee main "$@"

@@ -1,0 +1,53 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+_is_configured() {
+    ruby_run <<RUBY
+require 'json'
+
+config = JSON.load(File.read('${cw_ROOT}/etc/serf/config.json')) rescue {}
+
+if config['rpc_auth'] && (config['tags'] ||= {})['role']
+  exit 0
+else
+  exit 1
+end
+RUBY
+}
+
+main() {
+    if _is_configured; then
+	if systemctl -q is-active flight-events; then
+	    echo "Flight Events service is already running."
+	elif systemctl -q start flight-events; then
+	    echo "Flight Events service started: joining cluster ring."
+	else
+	    echo "Failed to start Flight Events service."
+	fi
+    else
+	echo "Flight Events service is unconfigured; please run '${cw_BINNAME} configure'"
+    fi
+}
+
+require ruby
+
+main "$@"

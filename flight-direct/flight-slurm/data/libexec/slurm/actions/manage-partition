@@ -1,0 +1,51 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+main() {
+    local op partition nodename
+    op="$1"
+    partition="$2"
+    nodename="$3"
+
+    if [ -z "$partition" -o -z "$nodename" ]; then
+	action_die "Usage: ${cw_BINNAME} <expand|reduce> <partition> <hostname>"
+    fi
+
+    if [ "$op" == "expand" ]; then
+	handler_run_helper ../share/add-node-to-partition "$nodename" "$partition"
+    elif [ "$op" == "reduce" ]; then
+	handler_run_helper ../share/remove-node-from-partition "$nodename" "$partition"
+    else
+	action_die "Usage: ${cw_BINNAME} <expand|reduce> <partition> <hostname>"
+    fi
+
+    if systemctl -q is-active flight-slurm-slurmctld; then
+	systemctl restart flight-slurm-slurmctld
+    fi
+}
+
+require action
+require handler
+
+export cw_CLUSTER_SLURM_config="${cw_ROOT}"/opt/slurm/etc/slurm.conf
+
+main "$@"

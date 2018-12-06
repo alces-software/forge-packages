@@ -1,0 +1,16 @@
+#!/bin/bash
+################################################################################
+##
+## Flight Direct - Slurm support script
+## Copyright (C) 2017-2018 Stephen F. Norledge and Alces Software Ltd.
+##
+################################################################################
+
+_lock() {
+    mkdir -p "${cw_ROOT}"/var/lock
+    exec 9> "${cw_ROOT}"/var/lock/flight-slurm.lock && flock -w30 9
+}
+
+_unlock() {
+    exec 9>&-
+}

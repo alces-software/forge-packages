@@ -1,0 +1,12 @@
+{
+  "type": "packages",
+  "attributes": {
+    "name": "flight-nfs",
+    "version": "2.1.3",
+    "username": "alces",
+    "summary": "Flight Direct management for the NFS configuration",
+    "dependencies": [
+	"alces/flight-events"
+    ]
+  }
+}

@@ -1,0 +1,83 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+_is_configured() {
+    ruby_run <<RUBY
+require 'yaml'
+
+config = YAML.load_file('${cw_ROOT}/etc/config/slurm.yml') rescue {}
+
+if config[:master_ip]
+  exit 0
+else
+  exit 1
+end
+RUBY
+}
+
+_start_slurmctld() {
+    if systemctl -q is-active flight-slurm-slurmctld; then
+	echo "Flight Slurm management service is already running."
+    elif systemctl -q start flight-slurm-slurmctld; then
+	echo "Flight Slurm management service started."
+    else
+	echo "Failed to start Flight Slurm management service."
+    fi
+}
+
+_start_slurmd() {
+    if systemctl -q is-active flight-slurm-slurmd; then
+	echo "Flight Slurm compute node service is already running."
+    elif systemctl -q start flight-slurm-slurmd; then
+	echo "Flight Slurm compute node service started."
+    else
+	echo "Failed to start Flight Slurm compute node service."
+    fi
+}
+
+_start_slurm() {
+    if [ "$FL_CONFIG_ROLE" == "login" ]; then
+	_start_slurmctld
+    else
+	_start_slurmd
+    fi
+}
+
+main() {
+    if _is_configured; then
+	if systemctl -q is-active flight-slurm-munged; then
+	    echo "Flight Slurm authentication service is already running."
+	    _start_slurm
+	elif systemctl -q start flight-slurm-munged; then
+	    echo "Flight Slurm authentication service started."
+	    _start_slurm
+	else
+	    echo "Failed to start Flight Slurm authentication service."
+	fi
+    else
+	echo "Flight Slurm service is unconfigured; please run '${cw_BINNAME} configure'"
+    fi
+}
+
+require ruby
+
+main "$@"

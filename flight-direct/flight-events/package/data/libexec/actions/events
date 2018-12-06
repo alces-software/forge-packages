@@ -1,0 +1,70 @@
+: '
+: NAME: events
+: SYNOPSIS: Manage cluster ring events service
+: VERSION: 1.0.0
+: ROOT: true
+: '
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+# vim: set filetype=sh :
+action=$1
+shift
+cw_BINNAME="${cw_BINNAME} $(basename "$0")"
+
+case $action in
+    h|he|hel|help)
+        exec /bin/bash ${cw_ROOT}/libexec/events/actions/help "$@"
+        ;;
+    sta|star|start)
+        exec /bin/bash ${cw_ROOT}/libexec/events/actions/start "$@"
+        ;;
+    sto|stop)
+        exec /bin/bash ${cw_ROOT}/libexec/events/actions/stop "$@"
+        ;;
+    t|tr|tri|trig|trigg|trigge|trigger)
+        exec /bin/bash ${cw_ROOT}/libexec/events/actions/trigger "$@"
+        ;;
+    li|lis|list|liste|listen)
+        exec /bin/bash ${cw_ROOT}/libexec/events/actions/listen "$@"
+        ;;
+    c|co|con|conf|confi|config|configu|configur|configure)
+        exec /bin/bash ${cw_ROOT}/libexec/events/actions/configure "$@"
+        ;;
+    *)
+        cat <<EOF
+Usage: $cw_BINNAME COMMAND [[OPTION]... [ARGS]]
+Manage cluster ring events service.
+
+Commands:
+EOF
+printf "  %-24s  %s\n" "$cw_BINNAME help" "More help about this command."
+printf "  %-24s  %s\n" "$cw_BINNAME start" "Join the cluster ring."
+printf "  %-24s  %s\n" "$cw_BINNAME stop" "Leave the cluster ring."
+printf "  %-24s  %s\n" "$cw_BINNAME trigger" "Trigger an event."
+printf "  %-24s  %s\n" "$cw_BINNAME listen" "Add a handler for an event."
+printf "  %-24s  %s\n" "$cw_BINNAME configure" "Configure the events service."
+cat <<EOF
+
+Please report bugs to support@alces-software.com
+Alces Software home page: <http://alces-software.com/>
+EOF
+esac

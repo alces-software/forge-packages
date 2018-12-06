@@ -2,17 +2,18 @@
 require files
 files_load_config distro
 
-if [[ "$cw_DIST" == "el6" ]]; then
-  echo "Slurm is not supported on EL6"
-  exit 1
-fi
-
 sed -e "s,_cw_ROOT_,${cw_ROOT},g" \
-    data/init/systemd/clusterware-slurm-slurmd.service \
-    > /etc/systemd/system/clusterware-slurm-slurmd.service
-cat <<EOF > /etc/tmpfiles.d/clusterware-slurm.conf
-# Clusterware Slurm runtime directory
+    data/init/systemd/flight-slurm-slurmd.service \
+    > /etc/systemd/system/flight-slurm-slurmd.service
+cat <<EOF > /etc/tmpfiles.d/flight-slurm.conf
+# Flight Direct Slurm runtime directory
 d /run/slurm 0755 slurm root -
 EOF
 
-systemctl enable clusterware-slurm-slurmd.service
+systemctl enable flight-slurm-slurmd.service
+
+# Create needed system dirs owned by Slurm user.
+slurm_system_dirs=(/var/{log,run,spool}/slurm)
+slurm_user='slurm'
+mkdir -p "${slurm_system_dirs[@]}"
+chown -R "${slurm_user}:${slurm_user}" "${slurm_system_dirs[@]}"

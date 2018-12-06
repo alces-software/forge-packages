@@ -1,0 +1,66 @@
+#!/bin/bash
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+_is_configured() {
+    ruby_run <<RUBY
+require 'yaml'
+
+config = YAML.load_file('${cw_ROOT}/etc/config/nfs.yml') rescue {}
+
+if config[:master_ip]
+  exit 0
+else
+  exit 1
+end
+RUBY
+}
+
+_start_server_if_master() {
+    if [ "$FL_CONFIG_ROLE" == "login" ]; then
+	if systemctl -q is-active nfs-server; then
+	    echo "NFS service is already running."
+	elif systemctl -q start nfs-server; then
+	    echo "NFS management service started."
+	else
+	    echo "Failed to start Flight Slurm management service."
+	fi
+    fi
+}
+
+main() {
+    if _is_configured; then
+	if systemctl -q is-active flight-slurm-munged; then
+	    _start_server_if_master
+	elif systemctl -q start rpcbind; then
+	    echo "RPC service started."
+	    _start_server_if_master
+	else
+	    echo "Failed to start RPC service."
+	fi
+    else
+	echo "Flight NFS services are unconfigured; please run '${cw_BINNAME} configure'"
+    fi
+}
+
+require ruby
+
+main "$@"

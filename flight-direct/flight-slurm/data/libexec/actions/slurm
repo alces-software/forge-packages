@@ -1,0 +1,82 @@
+: '
+: NAME: slurm
+: SYNOPSIS: Manage the Slurm scheduler
+: VERSION: 1.0.0
+: ROOT: true
+: '
+#==============================================================================
+# Copyright (C) 2018 Stephen F. Norledge and Alces Software Ltd.
+#
+# This file/package is part of Flight Direct.
+#
+# Flight Direct is free software: you can redistribute it and/or
+# modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of
+# the License, or (at your option) any later version.
+#
+# Flight Direct is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+# For more information on the Flight Direct, please visit:
+# https://github.com/alces-software/flight-direct
+#==============================================================================
+# vim: set filetype=sh :
+action=$1
+shift
+cw_BINNAME="${cw_BINNAME} $(basename "$0")"
+
+case $action in
+    h|he|hel|help)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/help "$@"
+        ;;
+    c|co|con|conf|confi|config|configu|configur|configure)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/configure "$@"
+        ;;
+    add-node)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/add-node "$@"
+        ;;
+    remove-node|rm-node)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/rm-node "$@"
+        ;;
+    add-partition)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/add-partition "$@"
+        ;;
+    remove-partition|rm-partition)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/rm-partition "$@"
+        ;;
+    manage-partition)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/manage-partition "$@"
+        ;;
+    start)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/start "$@"
+        ;;
+    stop)
+        exec /bin/bash ${cw_ROOT}/libexec/slurm/actions/stop "$@"
+        ;;
+    *)
+        cat <<EOF
+Usage: $cw_BINNAME COMMAND [[OPTION]... [ARGS]]
+Manage the Slurm scheduler.
+
+Commands:
+EOF
+printf "  %-28s  %s\n" "$cw_BINNAME help" "More help about this command."
+printf "  %-28s  %s\n" "$cw_BINNAME configure" "Configure the Slurm scheduler."
+printf "  %-28s  %s\n" "$cw_BINNAME add-node" "Add a compute node."
+printf "  %-28s  %s\n" "$cw_BINNAME rm-node" "Remove a compute node."
+printf "  %-28s  %s\n" "$cw_BINNAME add-partition" "Add a partition."
+printf "  %-28s  %s\n" "$cw_BINNAME rm-partition" "Remove a partition."
+printf "  %-28s  %s\n" "$cw_BINNAME manage-partition" "Manage a partition (add/remove nodes)."
+printf "  %-28s  %s\n" "$cw_BINNAME start" "Start the Slurm scheduler."
+printf "  %-28s  %s\n" "$cw_BINNAME stop" "Stop the Slurm scheduler."
+cat <<EOF
+
+Please report bugs to support@alces-software.com
+Alces Software home page: <http://alces-software.com/>
+EOF
+esac

@@ -1,9 +1,10 @@
 {
   "type": "packages",
   "attributes": {
-    "name": "slurm-compute",
+    "name": "flight-slurm",
     "version": "2.1.3",
-    "summary": "Slurm scheduler - compute node configuration",
+    "username": "alces",
+    "summary": "Flight Direct management for the Slurm scheduler",
     "dependencies": [
       "alces/slurm-common"
     ]
