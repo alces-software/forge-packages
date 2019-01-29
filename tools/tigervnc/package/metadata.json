@@ -2,7 +2,7 @@
   "type": "packages",
   "attributes": {
     "name": "tigervnc",
-    "version": "1.6.90+clusterware1",
+    "version": "1.6.90+clusterware2",
     "summary": "TigerVNC server",
     "dependencies": [
     ]
